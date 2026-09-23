@@ -1,0 +1,38 @@
+.moldura {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: calc(100vh - 62px);
+}
+
+.moldura__lado {
+  background: var(--azul-profundo);
+  color: #fff;
+  padding: clamp(40px, 5vw, 64px);
+  display: flex; flex-direction: column; justify-content: center;
+}
+.moldura__lado .marca { color: #fff; text-decoration: none; margin-bottom: 36px; }
+.moldura__lado h2 {
+  font-size: clamp(26px, 3vw, 34px);
+  margin: 0 0 32px;
+  max-width: 16ch;
+}
+.moldura__lado ul { list-style: none; margin: 0; padding: 0; }
+.moldura__lado li {
+  display: flex; gap: 14px; align-items: flex-start;
+  color: #B8C4D8; font-size: 16px;
+  padding: 12px 0;
+}
+.moldura__lado li span { color: var(--amarelo); flex: 0 0 22px; margin-top: 1px; }
+.moldura__nota { margin: 36px 0 0; font-size: 13.5px; color: #6B7A94; max-width: 34ch; }
+
+.moldura__forma {
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(32px, 5vw, 56px) 22px calc(48px + env(safe-area-inset-bottom, 0px));
+}
+.moldura__caixa { width: 100%; max-width: 420px; }
+.moldura__caixa h1 { font-size: 28px; }
+
+@media (max-width: 880px) {
+  .moldura { grid-template-columns: 1fr; min-height: 0; }
+  .moldura__lado { display: none; }
+}

@@ -1,0 +1,81 @@
+/* Telas internas: perfil e conta. */
+
+.painel-topo {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; flex-wrap: wrap;
+  padding: clamp(28px, 4vw, 40px) 0 22px;
+}
+.painel-topo h1 { font-size: clamp(25px, 3vw, 31px); }
+
+.ponto { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.ponto--verde { background: var(--verde); }
+.ponto--amarelo { background: #C89400; }
+
+.cartao--perfil { padding: 0; overflow: hidden; }
+
+.perfil-capa {
+  display: flex; gap: 16px; align-items: center;
+  padding: 24px;
+  background: linear-gradient(180deg, var(--azul-claro), var(--superficie));
+  border-bottom: 1px solid var(--borda);
+}
+.perfil-capa .ficha__avatar {
+  flex: 0 0 56px; width: 56px; height: 56px;
+  border-radius: 17px;
+  display: grid; place-items: center;
+  background: var(--azul-noite); color: #fff;
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 23px;
+}
+
+.perfil-descricao {
+  padding: 22px 24px 0;
+  color: var(--texto-suave);
+  font-size: 15.5px;
+  margin: 0;
+}
+
+.bloco { padding: 20px 24px 0; }
+.bloco:last-child { padding-bottom: 24px; }
+.bloco h3 {
+  font-size: 12.5px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--texto-claro); margin: 0 0 11px; font-weight: 600;
+}
+.bloco__texto {
+  display: flex; gap: 9px; align-items: flex-start;
+  font-size: 15px; color: var(--texto-suave);
+}
+.bloco__texto svg { flex: 0 0 17px; margin-top: 2px; color: var(--azul-medio); }
+
+/* Contador de categorias ------------------------------------------------ */
+.contador { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.contador p { margin: 0; color: var(--texto-suave); font-size: 15px; }
+.contador__marca {
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 14px;
+  color: var(--azul-medio);
+}
+.contador__trilha {
+  height: 5px; border-radius: 999px;
+  background: var(--azul-claro);
+  margin: 10px 0 18px;
+  overflow: hidden;
+}
+.contador__trilha span {
+  display: block; height: 100%;
+  background: var(--amarelo);
+  border-radius: 999px;
+  transition: width .25s ease;
+}
+
+/* Linhas de dados ------------------------------------------------------- */
+.dado {
+  display: flex; justify-content: space-between; gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--borda);
+  font-size: 15px;
+}
+.dado:last-child { border-bottom: 0; }
+.dado__rotulo { color: var(--texto-claro); }
+.dado__valor { color: var(--texto); text-align: right; font-weight: 500; }
+
+.cartao--perigo { border-color: #F0C2C2; }
+.cartao--perigo h2 { color: var(--vermelho); }

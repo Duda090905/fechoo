@@ -1,0 +1,200 @@
+const { Op } = require('sequelize');
+const { Usuario, TokenSenha } = require('../models');
+const { cpfValido, limpar, impressaoCpf } = require('../utils/cpf');
+const { senhaForte, gerarHash, conferir, REGRA } = require('../utils/senha');
+const { gerarJWT, gerarTokenRecuperacao, hashDeToken } = require('../utils/token');
+const { enviarLinkRecuperacao } = require('../utils/email');
+
+const MAX_TENTATIVAS = 5;
+const MINUTOS_BLOQUEIO = 15;
+const MINUTOS_TOKEN = 30;
+
+// US01 - Cadastro
+async function cadastrar(req, res, next) {
+  try {
+    const { nome, cpf, email, telefone, senha, tipo_perfil, sexo, aceite_termos } = req.body;
+
+    if (!nome || !email || !senha || !tipo_perfil) {
+      return res.status(400).json({ erro: 'Preencha nome, e-mail, senha e tipo de perfil.' });
+    }
+    if (!['contratante', 'prestador'].includes(tipo_perfil)) {
+      return res.status(400).json({ erro: 'Escolha entre contratante e prestador.' });
+    }
+    if (!cpfValido(cpf)) {
+      return res.status(400).json({ erro: 'Esse CPF nao e valido.' });
+    }
+    if (!senhaForte(senha)) {
+      return res.status(400).json({ erro: REGRA });
+    }
+    if (!aceite_termos) {
+      return res.status(400).json({ erro: 'E preciso aceitar os termos para criar a conta.' });
+    }
+
+    const jaExiste = await Usuario.findOne({
+      where: { [Op.or]: [{ email }, { cpf: limpar(cpf) }] }
+    });
+    if (jaExiste) {
+      // Mensagem unica de proposito: nao revela se a conta esta ativa,
+      // inativa ou suspensa. Quem e dono do CPF descobre entrando.
+      return res.status(409).json({
+        erro: 'Ja existe uma conta com esse e-mail ou CPF. Entre com sua senha ou recupere o acesso.',
+        conta_existente: true
+      });
+    }
+
+    /**
+     * US04 - a pessoa apagou os dados e esta voltando.
+     *
+     * O CPF nao existe mais no banco, mas a impressao dele sim. Se bater,
+     * a conta nova nasce ligada a antiga: os dados pessoais ela preenche
+     * de novo (foram apagados a pedido dela), mas a ficha de reputacao
+     * acompanha. Ninguem se limpa apagando a conta.
+     */
+    const anterior = await Usuario.findOne({
+      where: { cpf_hash: impressaoCpf(cpf), status: 'excluido' },
+      order: [['id', 'DESC']]
+    });
+
+    if (anterior && anterior.bloqueado_novo_cadastro) {
+      return res.status(403).json({
+        erro: 'Nao e possivel criar conta com esse CPF. Fale com o suporte.'
+      });
+    }
+
+    const usuario = await Usuario.create({
+      nome,
+      cpf: limpar(cpf),
+      conta_anterior_id: anterior ? anterior.id : null,
+      email,
+      telefone,
+      senha_hash: await gerarHash(senha),
+      tipo_perfil,
+      sexo: sexo || 'nao_informado',
+      aceite_termos: true,
+      aceite_termos_em: new Date()
+    });
+
+    return res.status(201).json({
+      usuario: usuario.publico(),
+      token: gerarJWT(usuario),
+      historico_recuperado: Boolean(anterior),
+      aviso: anterior
+        ? 'Encontramos um cadastro anterior com esse CPF. Seus dados pessoais foram apagados quando voce pediu, mas seu historico de servicos e avaliacoes continua vinculado a esta conta.'
+        : undefined
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+// US02 - Login
+async function entrar(req, res, next) {
+  try {
+    const { email, senha } = req.body;
+    const generico = { erro: 'E-mail ou senha incorretos.' };
+
+    const usuario = await Usuario.findOne({ where: { email } });
+    if (!usuario || usuario.status === 'excluido') {
+      return res.status(401).json(generico);
+    }
+    if (usuario.status === 'excluido') {
+      return res.status(401).json(generico);
+    }
+    if (usuario.status === 'suspenso') {
+      return res.status(403).json({ erro: 'Esta conta esta suspensa. Fale com o suporte.' });
+    }
+    if (usuario.bloqueado_ate && usuario.bloqueado_ate > new Date()) {
+      return res.status(429).json({ erro: 'Muitas tentativas. Tente de novo em alguns minutos.' });
+    }
+
+    const ok = await conferir(senha, usuario.senha_hash);
+    if (!ok) {
+      usuario.tentativas_login += 1;
+      if (usuario.tentativas_login >= MAX_TENTATIVAS) {
+        usuario.bloqueado_ate = new Date(Date.now() + MINUTOS_BLOQUEIO * 60000);
+        usuario.tentativas_login = 0;
+      }
+      await usuario.save();
+      return res.status(401).json(generico);
+    }
+
+    usuario.tentativas_login = 0;
+    usuario.bloqueado_ate = null;
+    await usuario.save();
+
+    // Conta inativa entra para poder se reativar, e o front sabe disso
+    // pelo sinalizador abaixo.
+    return res.json({
+      usuario: usuario.publico(),
+      token: gerarJWT(usuario),
+      conta_inativa: usuario.status === 'inativo'
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+// US03 - Pedir o link
+async function esqueciSenha(req, res, next) {
+  try {
+    const { email } = req.body;
+    // Resposta sempre igual: nao revela se a conta existe.
+    const resposta = { mensagem: 'Se existir uma conta com esse e-mail, o link chega em instantes.' };
+
+    const usuario = await Usuario.findOne({ where: { email, status: 'ativo' } });
+    if (!usuario) return res.json(resposta);
+
+    const { bruto, hash } = gerarTokenRecuperacao();
+    await TokenSenha.create({
+      usuario_id: usuario.id,
+      token_hash: hash,
+      expira_em: new Date(Date.now() + MINUTOS_TOKEN * 60000)
+    });
+
+    const base = process.env.URL_FRONT || 'http://localhost:5173';
+    await enviarLinkRecuperacao(usuario.email, `${base}/redefinir-senha?token=${bruto}`);
+
+    return res.json(resposta);
+  } catch (e) {
+    return next(e);
+  }
+}
+
+// US03 - Trocar a senha
+async function redefinirSenha(req, res, next) {
+  try {
+    const { token, senha } = req.body;
+
+    if (!senhaForte(senha)) {
+      return res.status(400).json({ erro: REGRA });
+    }
+
+    const registro = await TokenSenha.findOne({
+      where: { token_hash: hashDeToken(token), usado_em: null, expira_em: { [Op.gt]: new Date() } }
+    });
+    if (!registro) {
+      return res.status(400).json({ erro: 'Esse link expirou ou ja foi usado. Peca outro.' });
+    }
+
+    const usuario = await Usuario.findByPk(registro.usuario_id);
+    usuario.senha_hash = await gerarHash(senha);
+    usuario.tentativas_login = 0;
+    usuario.bloqueado_ate = null;
+    await usuario.save();
+
+    registro.usado_em = new Date();
+    await registro.save();
+
+    // Qualquer outro link pendente perde a validade.
+    await TokenSenha.update(
+      { usado_em: new Date() },
+      { where: { usuario_id: usuario.id, usado_em: null } }
+    );
+
+    return res.json({ mensagem: 'Senha alterada. Pode entrar com a nova.' });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { cadastrar, entrar, esqueciSenha, redefinirSenha };

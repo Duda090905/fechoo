@@ -1,0 +1,45 @@
+/* Identidade visual do Fecho.
+   Azul-noite carrega a confianca (o dinheiro fica guardado).
+   Amarelo-sinal aparece so na acao principal de cada tela. */
+:root {
+  /* Cor */
+  --azul-noite: #14243D;
+  --azul-profundo: #0E1A2D;
+  --azul-medio: #24406B;
+  --azul-claro: #E8EDF5;
+  --amarelo: #FFC93C;
+  --amarelo-escuro: #E8B222;
+  --amarelo-fraco: #FFF4D6;
+  --fundo: #F5F6F8;
+  --superficie: #FFFFFF;
+  --verde: #1E9E6A;
+  --verde-fraco: #E4F5EC;
+  --vermelho: #D64545;
+  --vermelho-fraco: #FDEDED;
+  --texto: #14243D;
+  --texto-suave: #5B6577;
+  --texto-claro: #98A3B5;
+  --borda: #DDE2EA;
+  --borda-escura: #2A3B57;
+
+  /* Forma */
+  --raio: 12px;
+  --raio-grande: 18px;
+  --raio-total: 999px;
+  --sombra: 0 1px 2px rgba(20, 36, 61, .06), 0 8px 24px rgba(20, 36, 61, .06);
+  --sombra-alta: 0 2px 4px rgba(20, 36, 61, .08), 0 18px 48px rgba(20, 36, 61, .12);
+
+  /* Ritmo */
+  --gap-1: 8px;
+  --gap-2: 14px;
+  --gap-3: 22px;
+  --gap-4: 36px;
+  --gap-5: 56px;
+  --gap-6: 88px;
+
+  /* Tipografia */
+  --fonte-titulo: 'Outfit', system-ui, sans-serif;
+  --fonte-texto: 'Inter', system-ui, sans-serif;
+  --display: clamp(34px, 6vw, 58px);
+  --titulo-secao: clamp(25px, 3.6vw, 34px);
+}

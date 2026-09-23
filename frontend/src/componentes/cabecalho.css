@@ -1,0 +1,71 @@
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--azul-noite);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.cabecalho--home { background: var(--azul-profundo); }
+
+.cabecalho__interno {
+  max-width: 1080px; margin: 0 auto;
+  padding: 15px 22px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+
+.marca {
+  font-family: var(--fonte-titulo);
+  font-size: 23px; font-weight: 700; letter-spacing: -.03em;
+  color: #fff; text-decoration: none;
+}
+.marca::after {
+  content: ''; display: inline-block;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--amarelo); margin-left: 4px; vertical-align: 3px;
+}
+
+.cabecalho__menu { display: flex; align-items: center; gap: 24px; }
+.cabecalho__menu a,
+.cabecalho__menu button {
+  color: #C3CEE1; text-decoration: none;
+  font-size: 14.5px; font-family: var(--fonte-texto);
+  background: none; border: 0; padding: 0; cursor: pointer;
+  transition: color .15s ease;
+}
+.cabecalho__menu a:hover, .cabecalho__menu button:hover { color: #fff; }
+
+.cabecalho__cta {
+  background: var(--amarelo);
+  color: var(--azul-noite) !important;
+  font-weight: 600;
+  padding: 9px 17px !important;
+  border-radius: var(--raio-total);
+}
+.cabecalho__cta:hover { background: var(--amarelo-escuro); }
+
+.cabecalho__hamburguer {
+  display: none;
+  background: none; border: 0; color: #fff; cursor: pointer; padding: 4px;
+}
+
+.cabecalho__gaveta {
+  display: none;
+  flex-direction: column; gap: 4px;
+  padding: 8px 22px 20px;
+  border-top: 1px solid var(--borda-escura);
+}
+.cabecalho__gaveta a, .cabecalho__gaveta button {
+  color: #C3CEE1; text-decoration: none; text-align: left;
+  font-size: 16px; padding: 11px 0;
+  background: none; border: 0; cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.cabecalho__gaveta .cabecalho__cta {
+  text-align: center; margin-top: 12px; border-bottom: 0;
+}
+
+@media (max-width: 780px) {
+  .cabecalho__menu { display: none; }
+  .cabecalho__hamburguer { display: block; }
+  .cabecalho__gaveta { display: flex; }
+}

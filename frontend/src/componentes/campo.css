@@ -1,0 +1,65 @@
+.campo { display: block; margin-bottom: 18px; }
+
+.campo__etiqueta {
+  display: block; margin-bottom: 7px;
+  font-family: var(--fonte-titulo);
+  font-size: 13.5px; font-weight: 600; letter-spacing: .01em;
+  color: var(--texto);
+}
+
+.campo__entrada,
+.campo select,
+.campo textarea {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  font-family: var(--fonte-texto);
+  font-size: 15.5px;
+  color: var(--texto);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.campo__entrada::placeholder, .campo textarea::placeholder { color: var(--texto-claro); }
+
+.campo__entrada:hover, .campo select:hover, .campo textarea:hover { border-color: #C3CCDA; }
+
+.campo__entrada:focus,
+.campo select:focus,
+.campo textarea:focus {
+  border-color: var(--azul-medio);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(36, 64, 107, .10);
+}
+
+/* Seta própria no select: o desenho padrão do sistema destoa do resto. */
+.campo select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235B6577' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  cursor: pointer;
+}
+
+.campo__entrada--erro { border-color: var(--vermelho); }
+.campo__ajuda { display: block; margin-top: 7px; font-size: 13px; color: var(--texto-suave); }
+.campo__erro { display: block; margin-top: 7px; font-size: 13px; color: var(--vermelho); }
+
+.campo textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
+
+/* Caixa de marcar ------------------------------------------------------- */
+.marcar {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 13px 15px;
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.marcar:hover { border-color: #C3CCDA; }
+.marcar input { margin: 3px 0 0; width: 17px; height: 17px; accent-color: var(--azul-noite); cursor: pointer; }
+.marcar span { font-size: 15px; color: var(--texto-suave); }
+.marcar--marcado { border-color: var(--azul-medio); background: var(--azul-claro); }

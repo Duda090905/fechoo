@@ -1,0 +1,13 @@
+.selecao { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.selecao__item {
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  color: var(--texto);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-family: var(--fonte-texto);
+  font-size: 14px;
+  cursor: pointer;
+}
+.selecao__item--ativo { background: var(--azul-noite); border-color: var(--azul-noite); color: #fff; }
+.selecao__item:disabled { opacity: .45; cursor: not-allowed; }

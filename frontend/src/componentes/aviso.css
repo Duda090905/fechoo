@@ -1,0 +1,9 @@
+.aviso {
+  border-radius: var(--raio);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 15px;
+}
+.aviso--erro { background: #FDEDED; color: #9B2C2C; }
+.aviso--sucesso { background: #E4F5EC; color: #146B49; }
+.aviso--neutro { background: #EEF1F6; color: var(--texto-suave); }

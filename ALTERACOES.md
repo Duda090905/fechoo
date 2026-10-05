@@ -10,8 +10,9 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | 1. Busca e perfil (US05) | 1, 2 e testes | Concluída |
 | 2. Sessão (US02/US03) | 4, 5, 12 e testes de recuperação | Concluída |
 | 3. Cadastro e perfil no front (US01/US05) | 3, 9, 6 | Concluída |
-| 4. Prioridade média | 7, 8, 10, 11 | Pendente |
-| 5. Endurecimento | 13, 14, restante do 15 | Pendente |
+| Enxugamento do escopo | Remoção do que não é dos 7 cards | Concluída |
+| 4. Prioridade média (revisada) | 7, 8, 11 e `schema.sql` | Pendente |
+| 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
 
 ---
 
@@ -294,3 +295,77 @@ Frontend:
    A prévia aparece na hora. Clique em **Salvar alterações**: a foto aparece no perfil e em **Profissionais**.
 5. Escolha um arquivo que não seja imagem (por exemplo, um `.pdf`) ou uma imagem acima de 2 MB: o erro aparece antes de enviar.
 6. Clique em **Remover** e salve: a foto some e volta a inicial do nome. O arquivo também some da pasta `backend/uploads/perfis`.
+
+---
+
+## Enxugamento do escopo: só os cards 01, 02, 03, 04, 05, 07 e 08
+
+O cliente pediu apenas esses sete cards no Sprint 1. Cada tarefa e critério do Word foi comparado com o código,
+e o que não pertence a nenhum deles foi removido. Parte vinha do código original, parte foi acrescentada nesta branch.
+
+### O que foi removido
+
+| O que saiu | Pertence a | Onde estava |
+|---|---|---|
+| Corrente de contas (`conta_anterior_id`, `servicos/historico.js`, aviso "histórico recuperado") | Reputação, Sprint 3 | `Usuario`, cadastro, `CriarConta.jsx` |
+| Impressão digital do CPF (`cpf_hash`, `impressaoCpf`, `CPF_PEPPER`) | Não está no US04 | `Usuario`, `utils/cpf.js`, exclusão definitiva, `.env.example` |
+| Banimento (`bloqueado_novo_cadastro`) | US25 (painel do administrador) | `Usuario`, cadastro |
+| Bloqueio após 5 tentativas de login (`tentativas_login`, `bloqueado_ate`) | Não está no US02 | `Usuario`, login, redefinição de senha |
+| Selo "Verificado" (`Prestador.verificado`) | US06 | `Prestador`, perfil da API, `Prestadores.jsx` |
+| Perfil `administrador` e status `suspenso` do **usuário** | US25 | enums de `Usuario`, login |
+| `PUT /api/conta` e o formulário de editar dados em **Minha conta** | Nenhum card pede editar o cadastro | `contaController`, rotas, `MinhaConta.jsx`, `api.js` |
+| Filtros de categoria e bairro na listagem, atalhos e seletores na tela | US09 (busca) | `prestadorController.listar`, `Prestadores.jsx` |
+| `Bairro.regiao` | Não era usado | `Bairro`, seed |
+
+### O que continua (e por quê)
+
+- **Desativar, reativar e apagar os dados da conta** (US04): foi informado que o cliente pediu a retenção de conta inativa.
+- **Pendências que bloqueiam a saída** (US04): critério "bloquear enquanto houver serviço em andamento ou valor retido".
+- **Status `suspenso` do prestador** (US07): o card pede o campo com ativo, pausado e suspenso.
+- **Foto de perfil por upload** (US05): o card pede "tela de edição de perfil com foto".
+- **Encerrar sessões ao trocar a senha** (US03) e **voltar ao login com token expirado** (US02): estão nos cards.
+- **Validação de e-mail, telefone e CPF e telefone obrigatório** (US01): "validação dos campos" e o texto da história.
+- **Listagem simples de prestadores**: necessária para demonstrar os critérios da US05, US07 e US08. Ficou só com
+  o filtro "apenas mulheres" (US08) e mostra apenas prestadores ativos com ao menos uma categoria e um bairro.
+
+### Comportamentos que mudaram
+
+- Contas sem os campos removidos funcionam igual. Quem apaga os dados da conta agora **libera o CPF**: um novo cadastro com ele
+  é uma conta nova, sem nenhum vínculo com a antiga.
+- Depois de cadastrado, o usuário não edita nome, telefone ou sexo. **Minha conta** só mostra os dados e oferece desativar,
+  reativar e apagar.
+- Cadastro e login não têm mais limite de tentativas.
+
+### Banco de dados
+
+Foram removidas do MySQL local as colunas `usuarios.cpf_hash`, `conta_anterior_id`, `bloqueado_novo_cadastro`, `tentativas_login`,
+`bloqueado_ate`, `prestadores.verificado` e `bairros.regiao`, e os valores `administrador` e `suspenso` dos enumerados de `usuarios`.
+Só havia duas contas de teste, nenhuma usando esses campos. Quem já tem banco criado pode rodar:
+
+```sql
+ALTER TABLE usuarios
+  DROP COLUMN cpf_hash, DROP COLUMN conta_anterior_id, DROP COLUMN bloqueado_novo_cadastro,
+  DROP COLUMN tentativas_login, DROP COLUMN bloqueado_ate,
+  MODIFY tipo_perfil ENUM('contratante','prestador') NOT NULL,
+  MODIFY status ENUM('ativo','inativo','excluido') DEFAULT 'ativo';
+ALTER TABLE prestadores DROP COLUMN verificado;
+ALTER TABLE bairros DROP COLUMN regiao;
+```
+
+Deixar as colunas antigas no banco também funciona (a aplicação simplesmente não as usa); o `ALTER` só evita divergência com os modelos.
+
+### Testes
+
+`npm run teste`: **89 critérios, 0 falhas** (eram 102). Saíram os testes das funcionalidades removidas: corrente de contas, banimento,
+`cpf_hash`, filtros de categoria e bairro, edição de telefone pela conta. Dois testes foram adaptados para não depender do `PUT /conta`
+(conta inativa bloqueada e conta reativada voltando a usar a plataforma). O build do frontend compila sem erros.
+
+### Plano revisado
+
+- **Cancelado:** rate limit, helmet e limite de JSON; script do administrador; teste de bloqueio após 5 tentativas;
+  recuperar senha de conta inativa. Nada disso está nos cards.
+- **Mantido para a fase 4:** registrar data e origem da exclusão (US04), histórico de pausas (US07), a nota de finalidade do
+  filtro entre mulheres (US08, já na README) e atualizar o `backend/schema.sql`.
+- **Em aberto com o cliente:** o prazo de retenção da conta inativa (valor e o que acontece quando vence).
+- **Decisão pendente:** a landing page (`Inicio.jsx`) apresenta Pix retido, disputa, taxa de 8% e histórico, que são de sprints
+  futuros. Não foi alterada.

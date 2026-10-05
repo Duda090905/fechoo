@@ -57,7 +57,6 @@ export const api = {
   redefinirSenha: (corpo) => requisitar('/auth/redefinir-senha', { metodo: 'POST', corpo }),
 
   minhaConta: () => requisitar('/conta', { autenticado: true }),
-  atualizarConta: (corpo) => requisitar('/conta', { metodo: 'PUT', corpo, autenticado: true }),
   pendencias: () => requisitar('/conta/pendencias', { autenticado: true }),
   desativarConta: (corpo) => requisitar('/conta', { metodo: 'DELETE', corpo, autenticado: true }),
   reativarConta: () => requisitar('/conta/reativar', { metodo: 'POST', autenticado: true }),

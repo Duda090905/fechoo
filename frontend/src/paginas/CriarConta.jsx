@@ -17,7 +17,6 @@ export default function CriarConta() {
   const [form, setForm] = useState(INICIAL);
   const [aceite, setAceite] = useState(false);
   const [erro, setErro] = useState('');
-  const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [cpfTocado, setCpfTocado] = useState(false);
   const { autenticar } = useAuth();
@@ -52,17 +51,6 @@ export default function CriarConta() {
     setEnviando(true);
     try {
       const dados = await api.cadastrar({ ...form, aceite_termos: true });
-
-      // US04 - a pessoa apagou os dados antes e esta voltando.
-      if (dados.historico_recuperado) {
-        setAviso(dados.aviso);
-        setTimeout(() => {
-          autenticar(dados.token, dados.usuario);
-          navegar(dados.usuario.tipo_perfil === 'prestador' ? '/meu-perfil' : '/prestadores');
-        }, 3500);
-        return;
-      }
-
       autenticar(dados.token, dados.usuario);
       navegar(dados.usuario.tipo_perfil === 'prestador' ? '/meu-perfil' : '/prestadores');
     } catch (e) {
@@ -80,7 +68,6 @@ export default function CriarConta() {
     >
       <form onSubmit={enviar}>
         <Aviso>{erro}</Aviso>
-        <Aviso tipo="neutro">{aviso}</Aviso>
 
         <Campo etiqueta="Eu quero">
           <select value={form.tipo_perfil} onChange={(e) => mudar('tipo_perfil', e.target.value)}>

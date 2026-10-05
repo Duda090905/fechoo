@@ -5,56 +5,23 @@ import { useAuth } from '../contexto/AuthContexto';
 import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
-import { formatarTelefone, telefoneValido } from '../utils/formatos';
+import { formatarTelefone } from '../utils/formatos';
 import './painel.css';
 
 export default function MinhaConta() {
   const { usuario, atualizarUsuario, sair } = useAuth();
   const inativa = usuario?.status === 'inativo';
 
-  const [form, setForm] = useState({ nome: '', telefone: '', sexo: 'nao_informado' });
-  const [editando, setEditando] = useState(false);
   const [pendencias, setPendencias] = useState([]);
   const [etapa, setEtapa] = useState('nenhuma'); // nenhuma | desativar | apagar
   const [confirmacao, setConfirmacao] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [salvando, setSalvando] = useState(false);
   const navegar = useNavigate();
-
-  useEffect(() => {
-    if (usuario) {
-      setForm({
-        nome: usuario.nome || '',
-        telefone: formatarTelefone(usuario.telefone),
-        sexo: usuario.sexo || 'nao_informado'
-      });
-    }
-  }, [usuario]);
 
   useEffect(() => {
     api.pendencias().then((d) => setPendencias(d.pendencias || [])).catch(() => setPendencias([]));
   }, []);
-
-  async function salvar(evento) {
-    evento.preventDefault();
-    setErro(''); setMensagem('');
-    if (!telefoneValido(form.telefone)) {
-      setErro('Informe o telefone com DDD, por exemplo (19) 99999-9999.');
-      return;
-    }
-    setSalvando(true);
-    try {
-      const dados = await api.atualizarConta(form);
-      atualizarUsuario(dados.usuario);
-      setEditando(false);
-      setMensagem('Dados atualizados.');
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setSalvando(false);
-    }
-  }
 
   async function reativar() {
     setErro(''); setMensagem('');
@@ -119,51 +86,24 @@ export default function MinhaConta() {
       )}
 
       <div className="cartao">
-        <div className="entre" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>Meus dados</h2>
-          {!editando && !inativa && (
-            <Botao tipo="secundario" className="botao--curto" type="button" onClick={() => setEditando(true)}>
-              Editar
-            </Botao>
-          )}
-        </div>
-
-        {!editando ? (
-          <div>
-            <div className="dado">
-              <span className="dado__rotulo">Nome</span>
-              <span className="dado__valor">{usuario?.nome}</span>
-            </div>
-            <div className="dado">
-              <span className="dado__rotulo">Telefone</span>
-              <span className="dado__valor">{formatarTelefone(usuario?.telefone) || 'não informado'}</span>
-            </div>
-            <div className="dado">
-              <span className="dado__rotulo">Tipo de perfil</span>
-              <span className="dado__valor">
-                {usuario?.tipo_perfil === 'prestador' ? 'Prestador de serviço' : 'Contratante'}
-              </span>
-            </div>
+        <h2>Meus dados</h2>
+        <div>
+          <div className="dado">
+            <span className="dado__rotulo">Nome</span>
+            <span className="dado__valor">{usuario?.nome}</span>
           </div>
-        ) : (
-          <form onSubmit={salvar}>
-            <Campo etiqueta="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
-            <Campo etiqueta="Telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: formatarTelefone(e.target.value) })} inputMode="tel" placeholder="(19) 99999-9999" required />
-            <Campo etiqueta="Sexo" ajuda="Opcional. Usado apenas no filtro de segurança entre mulheres.">
-              <select value={form.sexo} onChange={(e) => setForm({ ...form, sexo: e.target.value })}>
-                <option value="nao_informado">Prefiro não informar</option>
-                <option value="feminino">Feminino</option>
-                <option value="masculino">Masculino</option>
-              </select>
-            </Campo>
-            <div className="empilha">
-              <Botao type="submit" carregando={salvando}>Salvar alterações</Botao>
-              <Botao tipo="secundario" type="button" onClick={() => setEditando(false)}>Cancelar</Botao>
-            </div>
-          </form>
-        )}
+          <div className="dado">
+            <span className="dado__rotulo">Telefone</span>
+            <span className="dado__valor">{formatarTelefone(usuario?.telefone) || 'não informado'}</span>
+          </div>
+          <div className="dado">
+            <span className="dado__rotulo">Tipo de perfil</span>
+            <span className="dado__valor">
+              {usuario?.tipo_perfil === 'prestador' ? 'Prestador de serviço' : 'Contratante'}
+            </span>
+          </div>
+        </div>
       </div>
-
       {!inativa && (
         <div className="cartao cartao--perigo">
           <h2>Desativar minha conta</h2>

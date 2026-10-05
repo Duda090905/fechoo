@@ -6,8 +6,7 @@ class Bairro extends Model {
     return super.init({
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       nome: { type: DataTypes.STRING(80), allowNull: false },
-      cidade: { type: DataTypes.STRING(80), defaultValue: 'Campinas' },
-      regiao: { type: DataTypes.STRING(40), allowNull: true }
+      cidade: { type: DataTypes.STRING(80), defaultValue: 'Campinas' }
     }, { sequelize, tableName: 'bairros' });
   }
 

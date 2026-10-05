@@ -1,50 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../servicos/api';
-import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
 import Avatar from '../componentes/Avatar';
-import { IconeEscudo, IconeBusca } from '../componentes/Icones';
+import { IconeBusca } from '../componentes/Icones';
 import './prestadores.css';
 
-// Listagem simples: existe para provar as US07 e US08.
-// A busca completa, com ordenação por avaliação, é a US09.
+// Listagem simples: existe para provar as US05, US07 e US08.
+// A busca por categoria e bairro, com ordenação por avaliação, é a US09.
 export default function Prestadores() {
-  const [areas, setAreas] = useState([]);
-  const [bairros, setBairros] = useState([]);
-  const [categoria, setCategoria] = useState('');
-  const [bairro, setBairro] = useState('');
   const [somenteMulheres, setSomenteMulheres] = useState(false);
   const [prestadores, setPrestadores] = useState([]);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.areas(), api.bairros()])
-      .then(([a, b]) => { setAreas(a.areas || []); setBairros(b.bairros || []); })
-      .catch((e) => setErro(e.message));
-  }, []);
-
-  useEffect(() => {
     let ativo = true;
     setCarregando(true);
-    api.listarPrestadores({ categoria, bairro, somente_mulheres: somenteMulheres })
+    api.listarPrestadores({ somente_mulheres: somenteMulheres })
       .then((dados) => { if (ativo) { setPrestadores(dados.prestadores || []); setErro(''); } })
       .catch((e) => { if (ativo) setErro(e.message); })
       .finally(() => { if (ativo) setCarregando(false); });
     return () => { ativo = false; };
-  }, [categoria, bairro, somenteMulheres]);
-
-  // As categorias mais buscadas viram atalho; o resto fica no select.
-  const atalhos = useMemo(() => areas.flatMap((a) => a.categorias).slice(0, 8), [areas]);
-
-  function limpar() {
-    setCategoria('');
-    setBairro('');
-    setSomenteMulheres(false);
-  }
-
-  const temFiltro = categoria || bairro || somenteMulheres;
+  }, [somenteMulheres]);
 
   return (
     <>
@@ -58,52 +36,11 @@ export default function Prestadores() {
                 <>
                   <strong>{prestadores.length}</strong>
                   {prestadores.length === 1 ? ' profissional disponível' : ' profissionais disponíveis'}
-                  {bairro && bairros.length > 0 && ` em ${bairros.find((b) => String(b.id) === String(bairro))?.nome}`}
                 </>
               )}
           </p>
 
-          {atalhos.length > 0 && (
-            <div className="trilho" role="group" aria-label="Filtrar por serviço">
-              <button
-                type="button"
-                className={`trilho__item ${!categoria ? 'trilho__item--ativo' : ''}`}
-                onClick={() => setCategoria('')}
-              >
-                Todos
-              </button>
-              {atalhos.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`trilho__item ${String(categoria) === String(c.id) ? 'trilho__item--ativo' : ''}`}
-                  onClick={() => setCategoria(String(c.id))}
-                >
-                  {c.nome}
-                </button>
-              ))}
-            </div>
-          )}
-
           <div className="filtros">
-            <Campo etiqueta="">
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} aria-label="Serviço">
-                <option value="">Todos os serviços</option>
-                {areas.map((area) => (
-                  <optgroup key={area.id} label={area.nome}>
-                    {area.categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </Campo>
-
-            <Campo etiqueta="">
-              <select value={bairro} onChange={(e) => setBairro(e.target.value)} aria-label="Bairro">
-                <option value="">Todos os bairros</option>
-                {bairros.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
-              </select>
-            </Campo>
-
             <label className={`alternador ${somenteMulheres ? 'alternador--ativo' : ''}`}>
               <input
                 type="checkbox"
@@ -113,10 +50,8 @@ export default function Prestadores() {
               Apenas mulheres
             </label>
 
-            <span className="filtros__separador" />
-
-            {temFiltro && (
-              <Botao tipo="texto" type="button" onClick={limpar}>Limpar filtros</Botao>
+            {somenteMulheres && (
+              <Botao tipo="texto" type="button" onClick={() => setSomenteMulheres(false)}>Limpar filtro</Botao>
             )}
           </div>
         </div>
@@ -143,10 +78,14 @@ export default function Prestadores() {
         {!carregando && !erro && prestadores.length === 0 && (
           <div className="nada">
             <span className="nada__icone"><IconeBusca width="26" height="26" /></span>
-            <h3>Ninguém encontrado com esses filtros</h3>
-            <p>Tente outro bairro, ou tire o filtro de serviço para ver todo mundo.</p>
-            {temFiltro && (
-              <Botao tipo="secundario" type="button" onClick={limpar} className="botao--curto">
+            <h3>Ninguém encontrado</h3>
+            <p>
+              {somenteMulheres
+                ? 'Ainda não há prestadoras disponíveis. Tire o filtro para ver todo mundo.'
+                : 'Ainda não há profissionais com o perfil completo.'}
+            </p>
+            {somenteMulheres && (
+              <Botao tipo="secundario" type="button" onClick={() => setSomenteMulheres(false)} className="botao--curto">
                 Ver todos os profissionais
               </Botao>
             )}
@@ -160,11 +99,6 @@ export default function Prestadores() {
               <div style={{ minWidth: 0 }}>
                 <h2 className="ficha__nome">{p.nome}</h2>
                 <div className="ficha__selos">
-                  {p.verificado && (
-                    <span className="etiqueta etiqueta--ativo">
-                      <IconeEscudo width="14" height="14" /> Verificado
-                    </span>
-                  )}
                   {p.atende_apenas_mulheres && (
                     <span className="etiqueta">Atende apenas mulheres</span>
                   )}

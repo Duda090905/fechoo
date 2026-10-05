@@ -1,41 +1,10 @@
 const { Prestador } = require('../models');
-const { impressaoCpf } = require('../utils/cpf');
-const { normalizarTelefone } = require('../utils/contato');
 const { removerFotoPerfil } = require('../servicos/armazenamento');
 const { listarPendencias } = require('../servicos/pendencias');
 
 // US02 - dados da propria conta
 async function meusDados(req, res) {
   return res.json({ usuario: req.usuario.publico() });
-}
-
-// US01 - edicao dos dados cadastrais
-async function atualizar(req, res, next) {
-  try {
-    const { sexo } = req.body;
-    const nome = String(req.body.nome || '').trim();
-    const usuario = req.usuario;
-
-    if (nome.length > 120) {
-      return res.status(400).json({ erro: 'O nome pode ter no maximo 120 caracteres.' });
-    }
-    if (req.body.telefone !== undefined) {
-      const telefone = normalizarTelefone(req.body.telefone);
-      // Obrigatorio tambem na edicao: nao da para apagar o telefone.
-      if (!telefone) {
-        return res.status(400).json({ erro: 'Informe o telefone com DDD, por exemplo (19) 99999-9999.' });
-      }
-      usuario.telefone = telefone;
-    }
-
-    if (nome) usuario.nome = nome;
-    if (sexo) usuario.sexo = sexo;
-    await usuario.save();
-
-    return res.json({ usuario: usuario.publico() });
-  } catch (e) {
-    return next(e);
-  }
 }
 
 // US04 - o que impede sair
@@ -120,8 +89,6 @@ async function reativar(req, res, next) {
  * US04 - Exclusao definitiva (LGPD).
  *
  * So depois de a conta estar inativa. Apaga nome, e-mail, CPF e telefone.
- * Fica apenas o hash do CPF, para reconhecer reincidencia sem guardar o
- * documento - base legal: prevencao a fraude.
  */
 async function excluirDefinitivo(req, res, next) {
   try {
@@ -155,9 +122,6 @@ async function excluirDefinitivo(req, res, next) {
       await prestador.setBairros([]);
     }
 
-    // A impressao do CPF fica, o CPF sai. E o que permite reconhecer
-    // a pessoa se ela voltar, sem guardar o documento.
-    usuario.cpf_hash = usuario.cpf ? impressaoCpf(usuario.cpf) : null;
     usuario.nome = 'Usuario removido';
     usuario.email = null;
     usuario.cpf = null;
@@ -174,4 +138,4 @@ async function excluirDefinitivo(req, res, next) {
   }
 }
 
-module.exports = { meusDados, atualizar, pendencias, desativar, reativar, excluirDefinitivo };
+module.exports = { meusDados, pendencias, desativar, reativar, excluirDefinitivo };

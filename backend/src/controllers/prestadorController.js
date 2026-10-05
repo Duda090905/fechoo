@@ -11,7 +11,6 @@ function montarPerfil(prestador) {
     descricao: prestador.descricao,
     foto_url: urlPublica(prestador.foto_url),
     status: prestador.status,
-    verificado: prestador.verificado,
     atende_apenas_mulheres: prestador.atende_apenas_mulheres,
     categorias: (prestador.categorias || []).map((c) => ({ id: c.id, nome: c.nome })),
     bairros: (prestador.bairros || []).map((b) => ({ id: b.id, nome: b.nome }))
@@ -183,43 +182,27 @@ async function alternarPausa(req, res, next) {
   }
 }
 
-// Listagem simples (prova que US07 e US08 funcionam).
-// A busca completa com ordenacao por avaliacao e a US09, do proximo sprint.
+// Listagem simples (prova que US05, US07 e US08 funcionam).
+// Os filtros de categoria e bairro e a ordenacao por avaliacao sao a US09.
 async function listar(req, res, next) {
   try {
-    const { categoria, bairro, somente_mulheres } = req.query;
-
     const usuarioWhere = { status: 'ativo' };
-    if (somente_mulheres === 'true') usuarioWhere.sexo = 'feminino';
+    if (req.query.somente_mulheres === 'true') usuarioWhere.sexo = 'feminino';
 
-    // Passo 1: descobre quem entra. required: true em tudo, entao prestador
-    // sem categoria, sem bairro ou fora do filtro nao passa.
-    const elegiveis = await Prestador.findAll({
-      attributes: ['id'],
+    // required: true em tudo, entao prestador pausado, sem categoria ou sem
+    // bairro nao aparece.
+    const prestadores = await Prestador.findAll({
       where: { status: 'ativo' },
       include: [
-        { model: Usuario, as: 'usuario', attributes: [], where: usuarioWhere, required: true },
-        {
-          model: Categoria, as: 'categorias', attributes: [], through: { attributes: [] },
-          required: true, ...(categoria ? { where: { id: categoria } } : {})
-        },
-        {
-          model: Bairro, as: 'bairros', attributes: [], through: { attributes: [] },
-          required: true, ...(bairro ? { where: { id: bairro } } : {})
-        }
-      ]
+        { model: Usuario, as: 'usuario', attributes: ['nome', 'sexo'], where: usuarioWhere, required: true },
+        { model: Categoria, as: 'categorias', attributes: ['id', 'nome'], through: { attributes: [] }, required: true },
+        { model: Bairro, as: 'bairros', attributes: ['id', 'nome'], through: { attributes: [] }, required: true }
+      ],
+      order: [['id', 'ASC']]
     });
-    const ids = [...new Set(elegiveis.map((p) => p.id))];
-
-    // Passo 2: carrega o perfil completo. Assim o cartao mostra todas as
-    // categorias e bairros, e nao so a que casou com o filtro.
-    const prestadores = ids.length
-      ? await Prestador.findAll({ where: { id: ids }, include: INCLUDES, order: [['id', 'ASC']] })
-      : [];
     return res.json({ prestadores: prestadores.map(montarPerfil) });
   } catch (e) {
     return next(e);
   }
 }
-
 module.exports = { meuPerfil, salvarPerfil, enviarFoto, removerFoto, alternarPausa, listar };

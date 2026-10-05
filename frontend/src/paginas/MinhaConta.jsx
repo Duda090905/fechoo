@@ -79,7 +79,8 @@ export default function MinhaConta() {
           <h2>Sua conta está desativada</h2>
           <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
             Ninguém te encontra nas buscas e você não consegue contratar nem ser contratada.
-            Seu cadastro, seu histórico e suas avaliações continuam guardados.
+            Seu cadastro, seu histórico e suas avaliações continuam guardados por 12 meses. Se você não
+            voltar nesse prazo, seus dados pessoais são apagados, e avisamos por e-mail 30 dias antes.
           </p>
           <Botao type="button" onClick={reativar}>Reativar minha conta</Botao>
         </div>
@@ -109,7 +110,8 @@ export default function MinhaConta() {
           <h2>Desativar minha conta</h2>
           <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
             Você sai das buscas e perde o acesso, mas nada é apagado. Dá para voltar quando quiser,
-            com o mesmo histórico e as mesmas avaliações.
+            com o mesmo histórico e as mesmas avaliações. Se você ficar 12 meses sem voltar, seus dados
+            pessoais são apagados; avisamos por e-mail 30 dias antes.
           </p>
 
           {pendencias.length > 0 && (

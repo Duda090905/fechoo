@@ -11,8 +11,11 @@ class SolicitacaoExclusao extends Model {
       // desativacao   - conta passa a inativa, dados guardados
       // exclusao_dados - dados pessoais apagados (LGPD)
       tipo: { type: DataTypes.ENUM('desativacao', 'exclusao_dados'), allowNull: false },
-      // Canal do pedido. Hoje so existe o painel do proprio usuario.
-      origem: { type: DataTypes.ENUM('painel_usuario'), allowNull: false, defaultValue: 'painel_usuario' },
+      // Canal do pedido: o painel do proprio usuario ou a rotina automatica
+      // de retencao de contas inativas.
+      origem: {
+        type: DataTypes.ENUM('painel_usuario', 'rotina_automatica'), allowNull: false, defaultValue: 'painel_usuario'
+      },
       resultado: { type: DataTypes.ENUM('concluida', 'recusada_pendencia'), allowNull: false }
     }, { sequelize, tableName: 'solicitacoes_exclusao', updatedAt: false });
   }

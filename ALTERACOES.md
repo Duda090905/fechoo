@@ -12,6 +12,7 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | 3. Cadastro e perfil no front (US01/US05) | 3, 9, 6 | Concluída |
 | Enxugamento do escopo | Remoção do que não é dos 7 cards | Concluída |
 | 4. Prioridade média (revisada) | 7, 8, 11, `schema.sql` e home enxuta | Concluída |
+| Retenção de conta inativa (US04) | 12 meses, aviso 30 dias antes | Concluída |
 | 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
 
 ---
@@ -438,10 +439,70 @@ As tabelas `pausas` e `solicitacoes_exclusao` foram criadas sozinhas pelo `seque
 
 ### Em aberto
 
-- **Prazo de retenção da conta inativa:** falta o valor definido pelo cliente e o que acontece quando ele vence.
+- **Prazo de retenção da conta inativa:** implementado depois, na seção *Retenção de conta inativa* abaixo.
 
 ### Correção: botão "Criar conta" do cabeçalho
 
 O botão aparecia invisível e só ficava amarelo ao passar o mouse. A regra genérica dos links do menu
 (`.cabecalho__menu a { background: none }`) era mais específica que `.cabecalho__cta` e apagava o fundo, deixando o texto escuro
 sobre o cabeçalho escuro. A regra do botão passou a `.cabecalho .cabecalho__cta` (`cabecalho.css`), o que também corrige o menu do celular.
+
+---
+
+## Retenção de conta inativa (US04)
+
+Até aqui a conta desativada ficava guardada para sempre, o que não combina com a LGPD (arts. 15 e 16: o dado deve ser eliminado quando a
+finalidade acaba). Foi aplicada a recomendação pesquisada pelo grupo, **a confirmar com o cliente**.
+
+### Regras
+
+| Decisão | Como ficou |
+|---|---|
+| Prazo | **12 meses** depois de desativar (`RETENCAO_MESES` no `.env`) |
+| O que acontece | **Anonimiza**, igual ao botão "Apagar meus dados" (mantém o registro da conta, sem identificar a pessoa) |
+| Aviso | E-mail **30 dias antes** (`RETENCAO_AVISO_DIAS`). Sem SMTP, o aviso aparece no console |
+| Se voltar | **Entrar na conta zera o relógio** e cancela o aviso |
+| Pendências | Conta com serviço em andamento ou valor retido **nunca** é anonimizada |
+| Aviso atrasado | Se a rotina ficar parada e o aviso sair tarde, a exclusão espera completar os 30 dias |
+| Registro | Cada exclusão automática grava em `solicitacoes_exclusao` com origem `rotina_automatica` |
+
+### Como foi feito
+
+- `servicos/anonimizacao.js` (novo): `anonimizarConta`, extraída do botão "Apagar meus dados". O botão e a rotina usam a mesma função,
+  então os dois caminhos nunca divergem (apaga também o arquivo da foto e encerra a pausa).
+- `servicos/retencao.js` (novo): `processarRetencao` e `iniciarRotinaRetencao`. A rotina roda ao iniciar a API e a cada 24 horas
+  (`server.js`). Uma conta com erro não trava as outras.
+- `Usuario`: colunas `ultimo_acesso_em` e `aviso_retencao_em`. O relógio conta a partir do mais recente entre `desativado_em` e `ultimo_acesso_em`.
+  O login grava o último acesso e cancela o aviso.
+- `utils/email.js`: `enviarAvisoRetencao`, com a mesma saída para o console quando não há SMTP.
+- `SolicitacaoExclusao.origem` ganhou o valor `rotina_automatica`.
+- Front: **Minha conta** e o aceite dos termos em **Criar conta** informam o prazo de 12 meses e o aviso de 30 dias (valores fixos no texto;
+  se o `.env` mudar, o texto precisa mudar junto).
+
+### Banco de dados
+
+Quem já tem o banco criado precisa rodar uma vez (já aplicado no MySQL local):
+
+```sql
+ALTER TABLE usuarios
+  ADD COLUMN ultimo_acesso_em DATETIME NULL AFTER token_versao,
+  ADD COLUMN aviso_retencao_em DATETIME NULL AFTER ultimo_acesso_em;
+ALTER TABLE solicitacoes_exclusao
+  MODIFY origem ENUM('painel_usuario','rotina_automatica') NOT NULL DEFAULT 'painel_usuario';
+```
+
+O `schema.sql` já foi atualizado e validado.
+
+### Testes
+
+`npm run teste`: **106 critérios, 0 falhas** (eram 95). Os testes simulam o passar do tempo passando a data para `processarRetencao`:
+conta recém desativada não é tocada; conta ativa nunca é tocada; a 30 dias do vencimento recebe o aviso, e o aviso não se repete;
+passou o prazo sem os 30 dias de aviso: nada é apagado; cumpridos prazo e aviso: anonimiza; a exclusão fica registrada com origem da rotina;
+entrar na conta zera o relógio; conta com pendência nunca é anonimizada, e resolvida a pendência a rotina conclui.
+O build do frontend compila sem erros.
+
+### Limites
+
+- A rotina só roda enquanto a API está no ar. Em hospedagem real, vale um agendador externo (cron) chamando a mesma função.
+- Não há registro de acesso (log) além do último login; o art. 15 do Marco Civil (6 meses de registros de acesso) não pesa hoje, mas deve ser revisto se a plataforma passar a guardar logs.
+- O prazo e o comportamento (anonimizar, e não apagar tudo) continuam sendo uma recomendação até o cliente confirmar.

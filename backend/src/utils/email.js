@@ -27,4 +27,25 @@ async function enviarLinkRecuperacao(email, link) {
   return { simulado: false };
 }
 
-module.exports = { enviarLinkRecuperacao };
+// US04 - aviso de que os dados de uma conta desativada serao apagados.
+async function enviarAvisoRetencao(email, dataLimite) {
+  const data = dataLimite.toLocaleDateString('pt-BR');
+  const texto = `Sua conta no Fecho esta desativada. Se voce nao voltar a entrar ate ${data}, `
+    + 'seus dados pessoais serao apagados. Para manter sua conta, basta entrar e reativa-la.';
+
+  if (!transporte) {
+    console.log('\n[retencao] destinatario:', email);
+    console.log('[retencao] aviso:', texto, '\n');
+    return { simulado: true };
+  }
+
+  await transporte.sendMail({
+    from: 'Fecho <nao-responda@fecho.app>',
+    to: email,
+    subject: 'Seus dados no Fecho serao apagados',
+    text: texto
+  });
+  return { simulado: false };
+}
+
+module.exports = { enviarLinkRecuperacao, enviarAvisoRetencao };

@@ -92,6 +92,11 @@ async function entrar(req, res, next) {
       return res.status(401).json(generico);
     }
 
+    // US04 - entrar na conta zera o relogio da retencao e cancela o aviso.
+    usuario.ultimo_acesso_em = new Date();
+    usuario.aviso_retencao_em = null;
+    await usuario.save();
+
     // Conta inativa entra para poder se reativar, e o front sabe disso
     // pelo sinalizador abaixo.
     return res.json({

@@ -114,6 +114,7 @@ export default function CriarConta() {
           <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} style={{ marginTop: 4 }} />
           <span style={{ fontSize: 14, color: 'var(--texto-suave)' }}>
             Li e aceito os termos de uso e autorizo o tratamento dos meus dados conforme a LGPD.
+            Se eu desativar a conta e ficar 12 meses sem voltar, meus dados pessoais serão apagados.
           </span>
         </label>
 

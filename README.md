@@ -113,6 +113,16 @@ Os dois caminhos são bloqueados enquanto houver pendência em aberto.
 
 **Cadastro com CPF já usado.** A mensagem é sempre a mesma, seja a conta ativa ou inativa: *"Já existe uma conta com esse e-mail ou CPF. Entre com sua senha ou recupere o acesso."* Confirmar para um estranho que determinado CPF tem conta desativada seria vazamento de dado pessoal.
 
+**Retenção de conta inativa (US04).** Quem desativa a conta tem os dados guardados por 12 meses. Depois disso os dados pessoais são anonimizados, do mesmo jeito que no botão *Apagar meus dados*. Uma rotina (`src/servicos/retencao.js`) roda ao iniciar a API e uma vez por dia:
+
+- entrar na conta zera o relógio e cancela o aviso (a contagem parte do mais recente entre a desativação e o último acesso);
+- 30 dias antes do vencimento a pessoa recebe um e-mail de aviso (sem SMTP configurado, ele aparece no console). Se a rotina atrasar e o aviso sair tarde, a exclusão espera completar os 30 dias;
+- conta com pendência (serviço em andamento, valor retido) nunca é anonimizada;
+- cada exclusão automática fica registrada em `solicitacoes_exclusao` com origem `rotina_automatica`;
+- prazo e aviso podem ser mudados no `.env` com `RETENCAO_MESES` e `RETENCAO_AVISO_DIAS`.
+
+A anonimização mantém o registro da conta (para o que a lei exige guardar, como registros financeiros) sem identificar a pessoa.
+
 **Registro dos pedidos para sair (US04).** Cada pedido de desativação ou de exclusão dos dados grava data, origem (hoje só o painel do usuário) e resultado (concluído ou recusado por pendência) na tabela `solicitacoes_exclusao`. O registro guarda só o id do usuário, então continua existindo depois que a conta é anonimizada.
 
 **Histórico de pausas (US07).** Cada pausa do perfil vira um período (início e fim) na tabela `pausas`. É o que permitirá descontar o tempo pausado do tempo de resposta quando existirem as solicitações de serviço.
@@ -131,5 +141,5 @@ Os dois caminhos são bloqueados enquanto houver pendência em aberto.
 
 1. **As 17 categorias em `backend/src/database/seed.js` são uma proposta.** Trocar pelos nomes exatos definidos no escopo do grupo e rodar `npm run db:seed` de novo.
 2. **A lista de bairros** tem 25 bairros de Campinas, também para substituir pela lista oficial de vocês.
-3. **Prazo de retenção da conta inativa.** Hoje ela fica guardada para sempre. O cliente definiu um prazo; falta registrar o valor aqui e implementar o que acontece quando ele vence.
+3. **Retenção de conta inativa.** Implementada com 12 meses e aviso 30 dias antes (recomendação do grupo). Confirmar o prazo com o cliente e escrevê-lo nos termos de uso.
 4. **Fotos em disco.** Servem para desenvolvimento e apresentação; em hospedagem real, usar armazenamento externo.5. **Migrations.** O projeto usa `sequelize.sync()`, que resolve em desenvolvimento. Para produção o certo é migração versionada.

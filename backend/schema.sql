@@ -22,6 +22,10 @@ CREATE TABLE usuarios (
   aceite_termos_em DATETIME,
   -- sobe a cada troca de senha e encerra as sessoes anteriores
   token_versao INT NOT NULL DEFAULT 0,
+  -- retencao de conta inativa: o relogio dos 12 meses conta do mais recente entre
+  -- desativado_em e ultimo_acesso_em; aviso_retencao_em marca o envio do e-mail de aviso
+  ultimo_acesso_em DATETIME,
+  aviso_retencao_em DATETIME,
   desativado_em DATETIME,
   reativado_em DATETIME,
   excluido_em DATETIME,
@@ -117,7 +121,7 @@ CREATE TABLE solicitacoes_exclusao (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL,
   tipo ENUM('desativacao','exclusao_dados') NOT NULL,
-  origem ENUM('painel_usuario') NOT NULL DEFAULT 'painel_usuario',
+  origem ENUM('painel_usuario','rotina_automatica') NOT NULL DEFAULT 'painel_usuario',
   resultado ENUM('concluida','recusada_pendencia') NOT NULL,
   created_at DATETIME NOT NULL,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id),

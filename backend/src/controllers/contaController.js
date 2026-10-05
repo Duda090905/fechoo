@@ -1,7 +1,7 @@
 const { Prestador, SolicitacaoExclusao } = require('../models');
-const { removerFotoPerfil } = require('../servicos/armazenamento');
 const { listarPendencias } = require('../servicos/pendencias');
-const { iniciarPausa, encerrarPausa } = require('../servicos/pausas');
+const { iniciarPausa } = require('../servicos/pausas');
+const { anonimizarConta } = require('../servicos/anonimizacao');
 
 // US04 - registra data (created_at), origem e resultado de cada pedido.
 function registrarSolicitacao(usuarioId, tipo, resultado) {
@@ -116,28 +116,7 @@ async function excluirDefinitivo(req, res, next) {
       });
     }
 
-    const prestador = await Prestador.findOne({ where: { usuario_id: usuario.id } });
-    if (prestador) {
-      // A foto e dado pessoal: some do disco, nao so do banco.
-      await removerFotoPerfil(prestador.foto_url);
-      prestador.status = 'suspenso';
-      prestador.descricao = null;
-      prestador.foto_url = null;
-      await prestador.save();
-      await prestador.setCategorias([]);
-      await prestador.setBairros([]);
-      await encerrarPausa(prestador);
-    }
-
-    usuario.nome = 'Usuario removido';
-    usuario.email = null;
-    usuario.cpf = null;
-    usuario.telefone = null;
-    usuario.senha_hash = null;
-    usuario.sexo = 'nao_informado';
-    usuario.status = 'excluido';
-    usuario.excluido_em = new Date();
-    await usuario.save();
+    await anonimizarConta(usuario);
     await registrarSolicitacao(usuario.id, 'exclusao_dados', 'concluida');
 
     return res.json({ mensagem: 'Seus dados pessoais foram apagados. Essa conta nao volta.' });

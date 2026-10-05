@@ -24,6 +24,11 @@ class Usuario extends Model {
       // US03 - sobe a cada troca de senha. O JWT carrega a versao com que foi
       // emitido; se nao bater com a atual, a sessao esta encerrada.
       token_versao: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      // US04 - retencao de conta inativa. O relogio dos 12 meses conta a partir
+      // do mais recente entre desativado_em e ultimo_acesso_em; aviso_retencao_em
+      // marca quando o e-mail de aviso foi enviado (volta a nulo se a pessoa entrar).
+      ultimo_acesso_em: { type: DataTypes.DATE, allowNull: true },
+      aviso_retencao_em: { type: DataTypes.DATE, allowNull: true },
       desativado_em: { type: DataTypes.DATE, allowNull: true },
       reativado_em: { type: DataTypes.DATE, allowNull: true },
       excluido_em: { type: DataTypes.DATE, allowNull: true }

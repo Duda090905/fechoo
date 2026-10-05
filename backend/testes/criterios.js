@@ -532,6 +532,101 @@ async function rodar() {
   checar('apos apagar os dados o CPF fica livre, e o novo cadastro nao herda nada da conta antiga',
     mesmoCpfDepois.status === 201 && mesmoCpfDepois.dados.usuario.nome === 'Ana Souza Nova');
 
+  console.log('\nUS04 - Retencao de conta inativa (12 meses, aviso 30 dias antes)');
+  const { processarRetencao, somarMeses } = require('../src/servicos/retencao');
+  const DIA_MS = 24 * 60 * 60 * 1000;
+
+  // A rotina avisa por e-mail; sem SMTP o aviso cai no console. Silencia no teste.
+  async function rodarRetencao(agora) {
+    const original = console.log;
+    console.log = () => {};
+    try { return await processarRetencao(agora); } finally { console.log = original; }
+  }
+
+  async function contaInativa(dados) {
+    const cad = await chamar('/auth/register', { metodo: 'POST', corpo: dados });
+    await chamar('/conta', { metodo: 'DELETE', token: cad.dados.token, corpo: { confirmacao: 'DESATIVAR' } });
+    return Usuario.findOne({ where: { email: dados.email } });
+  }
+
+  const TEO = {
+    nome: 'Teo Lima', cpf: '34608514300', email: 'teo@teste.com', telefone: '19999990000',
+    senha: 'senha1234', tipo_perfil: 'contratante', aceite_termos: true
+  };
+  const teo = await contaInativa(TEO);
+  const vencimentoTeo = somarMeses(teo.desativado_em, 12);
+
+  const logo = await rodarRetencao(new Date());
+  checar('conta recem desativada nao recebe aviso nem e anonimizada',
+    logo.avisadas === 0 && logo.anonimizadas === 0);
+
+  const ativas = await Usuario.count({ where: { status: 'ativo' } });
+  await rodarRetencao(new Date(vencimentoTeo.getTime() - 60 * DIA_MS));
+  checar('conta ativa nunca e tocada pela rotina', (await Usuario.count({ where: { status: 'ativo' } })) === ativas);
+
+  const dentroDoAviso = new Date(vencimentoTeo.getTime() - 20 * DIA_MS);
+  const aviso = await rodarRetencao(dentroDoAviso);
+  await teo.reload();
+  checar('a 30 dias do vencimento a conta recebe o aviso',
+    aviso.avisadas === 1 && aviso.anonimizadas === 0 && teo.aviso_retencao_em !== null && teo.status === 'inativo');
+
+  const avisoRepetido = await rodarRetencao(new Date(dentroDoAviso.getTime() + DIA_MS));
+  checar('o aviso nao e enviado de novo no dia seguinte', avisoRepetido.avisadas === 0);
+
+  const passouPrazoSemAviso = await rodarRetencao(new Date(vencimentoTeo.getTime() + DIA_MS));
+  await teo.reload();
+  checar('passou o prazo, mas ainda nao houve 30 dias de aviso: nada e apagado',
+    passouPrazoSemAviso.anonimizadas === 0 && teo.status === 'inativo');
+
+  const depoisDoAviso = await rodarRetencao(new Date(dentroDoAviso.getTime() + 31 * DIA_MS));
+  await teo.reload();
+  checar('vencido o prazo e cumpridos 30 dias de aviso, os dados sao anonimizados',
+    depoisDoAviso.anonimizadas === 1 && teo.status === 'excluido'
+    && teo.email === null && teo.cpf === null && teo.nome === 'Usuario removido');
+
+  const logTeo = await SolicitacaoExclusao.findAll({ where: { usuario_id: teo.id } });
+  checar('a exclusao automatica fica registrada com origem da rotina',
+    logTeo.some((r) => r.origem === 'rotina_automatica' && r.tipo === 'exclusao_dados' && r.resultado === 'concluida'));
+
+  const UMA = {
+    nome: 'Uma Reis', cpf: '11122233396', email: 'uma@teste.com', telefone: '19999990000',
+    senha: 'senha1234', tipo_perfil: 'contratante', aceite_termos: true
+  };
+  const uma = await contaInativa(UMA);
+  const umAnoEMeio = somarMeses(new Date(), -18);
+  uma.desativado_em = umAnoEMeio;
+  uma.aviso_retencao_em = new Date(Date.now() - 20 * DIA_MS);
+  await uma.save();
+  const voltouAEntrar = await chamar('/auth/login', { metodo: 'POST', corpo: { email: UMA.email, senha: UMA.senha } });
+  await uma.reload();
+  checar('entrar na conta zera o relogio e cancela o aviso',
+    voltouAEntrar.status === 200 && uma.aviso_retencao_em === null && uma.ultimo_acesso_em !== null);
+
+  const aposVoltar = await rodarRetencao(new Date());
+  await uma.reload();
+  checar('conta que voltou a entrar nao e apagada', aposVoltar.anonimizadas === 0 && uma.status === 'inativo');
+
+  const VERA = {
+    nome: 'Vera Costa', cpf: '12345678909', email: 'vera@teste.com', telefone: '19999990000',
+    senha: 'senha1234', tipo_perfil: 'contratante', aceite_termos: true
+  };
+  const vera = await contaInativa(VERA);
+  vera.desativado_em = somarMeses(new Date(), -18);
+  vera.aviso_retencao_em = new Date(Date.now() - 60 * DIA_MS);
+  await vera.save();
+  registrarVerificador(async (usuarioId) => (usuarioId === vera.id
+    ? { tipo: 'servico', descricao: 'Servico em andamento', quantidade: 1 }
+    : null));
+  const rodadaComPendencia = await rodarRetencao(new Date());
+  await vera.reload();
+  checar('conta com pendencia em aberto nunca e anonimizada pela rotina',
+    rodadaComPendencia.anonimizadas === 0 && vera.status === 'inativo');
+  limparVerificadores();
+  const rodadaSemPendencia = await rodarRetencao(new Date());
+  await vera.reload();
+  checar('resolvida a pendencia, a rotina conclui a anonimizacao',
+    rodadaSemPendencia.anonimizadas === 1 && vera.status === 'excluido');
+
   console.log('\nUS04 - Apagar os dados tambem apaga a foto do disco');
   const LIA = {
     nome: 'Lia Prado', cpf: '93541134780', email: 'lia@teste.com', telefone: '19999990000',

@@ -25,6 +25,9 @@ class Usuario extends Model {
       // US02 - bloqueio por tentativas
       tentativas_login: { type: DataTypes.INTEGER, defaultValue: 0 },
       bloqueado_ate: { type: DataTypes.DATE, allowNull: true },
+      // US03 - sobe a cada troca de senha. O JWT carrega a versao com que foi
+      // emitido; se nao bater com a atual, a sessao esta encerrada.
+      token_versao: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       desativado_em: { type: DataTypes.DATE, allowNull: true },
       reativado_em: { type: DataTypes.DATE, allowNull: true },
       excluido_em: { type: DataTypes.DATE, allowNull: true },

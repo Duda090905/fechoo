@@ -1,5 +1,7 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
 
+export const SESSAO_EXPIRADA = 'fecho:sessao-expirada';
+
 function pegarToken() {
   try { return localStorage.getItem('fecho_token'); } catch { return null; }
 }
@@ -23,6 +25,13 @@ async function requisitar(caminho, { metodo = 'GET', corpo, autenticado = false 
   }
 
   const dados = await resposta.json().catch(() => ({}));
+
+  // US02 - token expirado ou encerrado: avisa o app para voltar ao login.
+  // So vale para chamadas autenticadas; no login, 401 e senha errada.
+  if (resposta.status === 401 && autenticado) {
+    window.dispatchEvent(new Event(SESSAO_EXPIRADA));
+  }
+
   if (!resposta.ok) throw new Error(dados.erro || 'Algo deu errado. Tente de novo.');
   return dados;
 }

@@ -97,9 +97,6 @@ async function entrar(req, res, next) {
     if (!usuario || usuario.status === 'excluido') {
       return res.status(401).json(generico);
     }
-    if (usuario.status === 'excluido') {
-      return res.status(401).json(generico);
-    }
     if (usuario.status === 'suspenso') {
       return res.status(403).json({ erro: 'Esta conta esta suspensa. Fale com o suporte.' });
     }
@@ -180,6 +177,8 @@ async function redefinirSenha(req, res, next) {
     usuario.senha_hash = await gerarHash(senha);
     usuario.tentativas_login = 0;
     usuario.bloqueado_ate = null;
+    // Encerra todas as sessoes abertas com a senha antiga.
+    usuario.token_versao = (usuario.token_versao || 0) + 1;
     await usuario.save();
 
     registro.usado_em = new Date();

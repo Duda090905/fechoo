@@ -12,7 +12,7 @@ export default function Entrar() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const { autenticar } = useAuth();
+  const { autenticar, sessaoExpirada } = useAuth();
   const navegar = useNavigate();
 
   async function enviar(evento) {
@@ -46,6 +46,7 @@ export default function Entrar() {
       )}
     >
       <form onSubmit={enviar}>
+        <Aviso tipo="neutro">{sessaoExpirada ? 'Sua sessão terminou. Entre de novo para continuar.' : ''}</Aviso>
         <Aviso>{erro}</Aviso>
         <Campo etiqueta="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         <Campo etiqueta="Senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required autoComplete="current-password" />

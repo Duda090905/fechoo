@@ -123,6 +123,82 @@ async function rodar() {
   });
   checar('token de recuperacao invalido e recusado', tokenInvalido.status === 400);
 
+  // O link vai para o console quando nao ha SMTP; captura para usar o token de verdade.
+  async function pedirLink(email) {
+    const original = console.log;
+    let link = null;
+    console.log = (...args) => {
+      const texto = args.join(' ');
+      const achou = texto.match(/token=([0-9a-f]+)/);
+      if (achou) link = achou[1];
+    };
+    try {
+      await chamar('/auth/esqueci-senha', { metodo: 'POST', corpo: { email } });
+    } finally {
+      console.log = original;
+    }
+    return link;
+  }
+
+  const CARLA = {
+    nome: 'Carla Dias', cpf: '16899535009', email: 'carla@teste.com',
+    senha: 'senhaantiga1', tipo_perfil: 'contratante', aceite_termos: true
+  };
+  const cadCarla = await chamar('/auth/register', { metodo: 'POST', corpo: CARLA });
+  const tokenCarlaAntigo = cadCarla.dados.token;
+
+  const linkA = await pedirLink(CARLA.email);
+  const linkB = await pedirLink(CARLA.email);
+  checar('o pedido gera um token de uso no link', Boolean(linkA) && Boolean(linkB) && linkA !== linkB);
+
+  const senhaFracaNoLink = await chamar('/auth/redefinir-senha', {
+    metodo: 'POST', corpo: { token: linkB, senha: '123' }
+  });
+  checar('senha fraca na redefinicao e recusada sem gastar o link', senhaFracaNoLink.status === 400);
+
+  const redefinicao = await chamar('/auth/redefinir-senha', {
+    metodo: 'POST', corpo: { token: linkB, senha: 'senhanova1' }
+  });
+  checar('link valido redefine a senha', redefinicao.status === 200);
+
+  const reuso = await chamar('/auth/redefinir-senha', {
+    metodo: 'POST', corpo: { token: linkB, senha: 'outrasenha1' }
+  });
+  checar('link ja usado nao redefine de novo', reuso.status === 400);
+
+  const outroLink = await chamar('/auth/redefinir-senha', {
+    metodo: 'POST', corpo: { token: linkA, senha: 'outrasenha1' }
+  });
+  checar('outros links pendentes perdem a validade apos o uso', outroLink.status === 400);
+
+  const { TokenSenha } = require('../src/models');
+  const { hashDeToken } = require('../src/utils/token');
+  const carlaNoBanco = await Usuario.findOne({ where: { email: CARLA.email } });
+  await TokenSenha.create({
+    usuario_id: carlaNoBanco.id, token_hash: hashDeToken('link-vencido'),
+    expira_em: new Date(Date.now() - 60000)
+  });
+  const vencido = await chamar('/auth/redefinir-senha', {
+    metodo: 'POST', corpo: { token: 'link-vencido', senha: 'outrasenha1' }
+  });
+  checar('link expirado nao redefine a senha', vencido.status === 400);
+
+  const loginAntiga = await chamar('/auth/login', {
+    metodo: 'POST', corpo: { email: CARLA.email, senha: CARLA.senha }
+  });
+  checar('apos redefinir, a senha antiga nao funciona mais', loginAntiga.status === 401);
+
+  const loginNova = await chamar('/auth/login', {
+    metodo: 'POST', corpo: { email: CARLA.email, senha: 'senhanova1' }
+  });
+  checar('apos redefinir, a senha nova funciona', loginNova.status === 200 && Boolean(loginNova.dados.token));
+
+  const sessaoAntiga = await chamar('/conta', { token: tokenCarlaAntigo });
+  checar('sessao aberta antes da redefinicao e encerrada', sessaoAntiga.status === 401);
+
+  const sessaoNova = await chamar('/conta', { token: loginNova.dados.token });
+  checar('sessao aberta depois da redefinicao funciona', sessaoNova.status === 200);
+
   console.log('\nUS05 - Perfil do prestador');
   const cadPrestadora = await chamar('/auth/register', { metodo: 'POST', corpo: PRESTADORA });
   const tokenRita = cadPrestadora.dados.token;

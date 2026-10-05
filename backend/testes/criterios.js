@@ -277,6 +277,8 @@ async function rodar() {
     corpo: { descricao: 'Faco instalacoes eletricas.', categorias: idsCategorias.slice(0, 2), bairros: [bairro.id] }
   });
   checar('salva perfil com ate 5 categorias', perfilRita.status === 200 && perfilRita.dados.prestador.categorias.length === 2);
+  checar('a opcao "atendo apenas mulheres" nunca vem marcada por padrao (US08)',
+    perfilRita.dados.prestador.atende_apenas_mulheres === false);
 
   await chamar('/prestadores/meu-perfil', {
     metodo: 'PUT', token: tokenJoao,

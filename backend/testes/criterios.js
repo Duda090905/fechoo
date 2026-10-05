@@ -9,7 +9,7 @@ process.env.JWT_SECRET = 'chave-de-teste';
 // Fotos de teste vao para uma pasta temporaria, nunca para backend/uploads.
 process.env.UPLOADS_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'fecho-uploads-'));
 
-const { sequelize, Area, Categoria, Bairro } = require('../src/models');
+const { sequelize, Area, Categoria, Bairro, Prestador, Pausa, SolicitacaoExclusao } = require('../src/models');
 const app = require('../src/app');
 
 let base;
@@ -413,6 +413,19 @@ async function rodar() {
   checar('ao retomar, volta a aparecer com o perfil intacto',
     retomada.dados.status === 'ativo' && depoisDaPausa.dados.prestadores.length === 2);
 
+  const donoJoao = await Prestador.findOne({ include: [{ association: 'usuario', where: { email: PRESTADOR.email } }] });
+  const periodos = await Pausa.findAll({ where: { prestador_id: donoJoao.id }, order: [['id', 'ASC']] });
+  checar('cada pausa vira um periodo com inicio e fim',
+    periodos.length === 1 && periodos[0].inicio && periodos[0].fim && periodos[0].fim >= periodos[0].inicio);
+
+  await chamar('/prestadores/pausa', { metodo: 'PATCH', token: tokenJoao });
+  const emAberto = await Pausa.findAll({ where: { prestador_id: donoJoao.id, fim: null } });
+  checar('pausa em andamento fica com o fim em aberto', emAberto.length === 1);
+  await chamar('/prestadores/pausa', { metodo: 'PATCH', token: tokenJoao });
+  const todos = await Pausa.count({ where: { prestador_id: donoJoao.id } });
+  const abertos = await Pausa.count({ where: { prestador_id: donoJoao.id, fim: null } });
+  checar('o historico guarda todos os periodos, e nenhum fica aberto depois de retomar', todos === 2 && abertos === 0);
+
   console.log('\nUS08 - Filtro de atendimento entre mulheres');
   const homemMarcando = await chamar('/prestadores/meu-perfil', {
     metodo: 'PUT', token: tokenJoao, corpo: { atende_apenas_mulheres: true }
@@ -440,6 +453,12 @@ async function rodar() {
 
   const bloqueada = await chamar('/conta', { metodo: 'DELETE', token: tokenAna, corpo: { confirmacao: 'DESATIVAR' } });
   checar('nao desativa com pendencia em aberto', bloqueada.status === 409);
+
+  const pedidoRecusado = await SolicitacaoExclusao.findAll({ where: { usuario_id: salvo.id } });
+  checar('o pedido recusado por pendencia fica registrado, com data e origem',
+    pedidoRecusado.length === 1 && pedidoRecusado[0].tipo === 'desativacao'
+    && pedidoRecusado[0].resultado === 'recusada_pendencia'
+    && pedidoRecusado[0].origem === 'painel_usuario' && pedidoRecusado[0].createdAt instanceof Date);
 
   limparVerificadores();
   const semPendencia = await chamar('/conta/pendencias', { token: tokenAna });
@@ -490,6 +509,14 @@ async function rodar() {
     metodo: 'DELETE', token: tokenInativa, corpo: { confirmacao: 'APAGAR MEUS DADOS' }
   });
   checar('apaga os dados em definitivo', apagou.status === 200);
+
+  const registros = await SolicitacaoExclusao.findAll({ where: { usuario_id: salvo.id }, order: [['id', 'ASC']] });
+  const concluidas = registros.filter((r) => r.resultado === 'concluida');
+  checar('cada pedido concluido fica registrado (2 desativacoes e 1 exclusao de dados)',
+    concluidas.filter((r) => r.tipo === 'desativacao').length === 2
+    && concluidas.filter((r) => r.tipo === 'exclusao_dados').length === 1);
+  checar('o registro dos pedidos sobrevive a anonimizacao da conta',
+    registros.length === 4 && registros.every((r) => r.origem === 'painel_usuario'));
 
   const anonimizado = await Usuario.findOne({ where: { id: salvo.id } });
   checar('dados pessoais anonimizados no banco',

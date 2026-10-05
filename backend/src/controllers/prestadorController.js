@@ -1,4 +1,5 @@
 const { Prestador, Usuario, Categoria, Bairro } = require('../models');
+const { iniciarPausa, retomar } = require('../servicos/pausas');
 const { detectarTipo, salvarFotoPerfil, removerFotoPerfil, urlPublica } = require('../servicos/armazenamento');
 
 const LIMITE_CATEGORIAS = 5;
@@ -167,9 +168,8 @@ async function alternarPausa(req, res, next) {
     }
 
     const pausar = prestador.status === 'ativo';
-    prestador.status = pausar ? 'pausado' : 'ativo';
-    prestador.pausado_em = pausar ? new Date() : null;
-    await prestador.save();
+    if (pausar) await iniciarPausa(prestador);
+    else await retomar(prestador);
 
     return res.json({
       status: prestador.status,

@@ -6,6 +6,7 @@
 CREATE DATABASE IF NOT EXISTS fecho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE fecho;
 
+-- US01, US02, US03, US04
 CREATE TABLE usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(120) NOT NULL,
@@ -14,19 +15,22 @@ CREATE TABLE usuarios (
   telefone VARCHAR(20),
   senha_hash VARCHAR(120),
   sexo ENUM('feminino','masculino','nao_informado') DEFAULT 'nao_informado',
-  tipo_perfil ENUM('contratante','prestador','administrador') NOT NULL,
-  status ENUM('ativo','suspenso','excluido') DEFAULT 'ativo',
+  tipo_perfil ENUM('contratante','prestador') NOT NULL,
+  -- inativo: desativada pela propria pessoa; excluido: dados apagados (LGPD)
+  status ENUM('ativo','inativo','excluido') DEFAULT 'ativo',
   aceite_termos BOOLEAN DEFAULT FALSE,
   aceite_termos_em DATETIME,
-  tentativas_login INT DEFAULT 0,
-  bloqueado_ate DATETIME,
+  -- sobe a cada troca de senha e encerra as sessoes anteriores
+  token_versao INT NOT NULL DEFAULT 0,
+  desativado_em DATETIME,
+  reativado_em DATETIME,
   excluido_em DATETIME,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
-  INDEX idx_usuarios_email (email),
   INDEX idx_usuarios_status (status)
 );
 
+-- US05
 CREATE TABLE areas (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(60) NOT NULL UNIQUE,
@@ -48,21 +52,21 @@ CREATE TABLE bairros (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(80) NOT NULL,
   cidade VARCHAR(80) DEFAULT 'Campinas',
-  regiao VARCHAR(40),
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   INDEX idx_bairros_nome (nome)
 );
 
+-- US05, US07, US08
 CREATE TABLE prestadores (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL UNIQUE,
   descricao TEXT,
+  -- caminho da foto enviada (/uploads/perfis/<nome>), nunca endereco externo
   foto_url VARCHAR(255),
   status ENUM('ativo','pausado','suspenso') DEFAULT 'ativo',
   pausado_em DATETIME,
   atende_apenas_mulheres BOOLEAN DEFAULT FALSE,
-  verificado BOOLEAN DEFAULT FALSE,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
@@ -85,6 +89,17 @@ CREATE TABLE prestador_bairros (
   FOREIGN KEY (bairro_id) REFERENCES bairros(id)
 );
 
+-- US07: um registro por pausa; fim vazio = pausa em andamento
+CREATE TABLE pausas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  prestador_id INT NOT NULL,
+  inicio DATETIME NOT NULL,
+  fim DATETIME,
+  FOREIGN KEY (prestador_id) REFERENCES prestadores(id),
+  INDEX idx_pausas_prestador (prestador_id)
+);
+
+-- US03
 CREATE TABLE tokens_senha (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL,
@@ -94,4 +109,17 @@ CREATE TABLE tokens_senha (
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+);
+
+-- US04: data (created_at), origem e resultado de cada pedido para sair.
+-- Guarda so o id, sem dado pessoal, entao sobrevive a anonimizacao.
+CREATE TABLE solicitacoes_exclusao (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT NOT NULL,
+  tipo ENUM('desativacao','exclusao_dados') NOT NULL,
+  origem ENUM('painel_usuario') NOT NULL DEFAULT 'painel_usuario',
+  resultado ENUM('concluida','recusada_pendencia') NOT NULL,
+  created_at DATETIME NOT NULL,
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+  INDEX idx_solicitacoes_usuario (usuario_id)
 );

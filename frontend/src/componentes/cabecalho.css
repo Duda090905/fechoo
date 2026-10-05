@@ -34,14 +34,17 @@
 }
 .cabecalho__menu a:hover, .cabecalho__menu button:hover { color: #fff; }
 
-.cabecalho__cta {
+/* O prefixo .cabecalho sobe a especificidade: sem ele, a regra generica dos
+   links do menu (background: none) apagava o fundo amarelo e o texto escuro
+   ficava invisivel sobre o cabecalho escuro, aparecendo so no hover. */
+.cabecalho .cabecalho__cta {
   background: var(--amarelo);
   color: var(--azul-noite) !important;
   font-weight: 600;
   padding: 9px 17px !important;
   border-radius: var(--raio-total);
 }
-.cabecalho__cta:hover { background: var(--amarelo-escuro); }
+.cabecalho .cabecalho__cta:hover { background: var(--amarelo-escuro); }
 
 .cabecalho__hamburguer {
   display: none;

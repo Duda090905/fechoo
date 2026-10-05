@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
-import { IconeCadeado, IconeEscudo, IconeCarteira } from './Icones';
+import { IconeBusca, IconeCadeado, IconeEscudo } from './Icones';
 import './moldura-auth.css';
 
 const ARGUMENTOS = [
-  { icone: <IconeCadeado />, texto: 'O pagamento fica retido até o serviço terminar.' },
-  { icone: <IconeEscudo />, texto: 'Seu endereço só aparece depois que você aceita o orçamento.' },
-  { icone: <IconeCarteira />, texto: 'Quem trabalha sai de casa com o dinheiro garantido.' }
+  { icone: <IconeBusca />, texto: 'Encontre quem atende no seu bairro.' },
+  { icone: <IconeEscudo />, texto: 'Prefere ser atendida por uma mulher? Use o filtro.' },
+  { icone: <IconeCadeado />, texto: 'Seus dados são seus: apague quando quiser.' }
 ];
 
 // Nas telas de conta, a lateral escura repete por que vale a pena
@@ -15,14 +15,14 @@ export default function MolduraAuth({ titulo, subtitulo, children, rodape }) {
     <div className="moldura">
       <aside className="moldura__lado">
         <Link to="/" className="marca">Fechô</Link>
-        <h2>Serviço contratado, dinheiro garantido.</h2>
+        <h2>O profissional certo, perto de você.</h2>
         <ul>
           {ARGUMENTOS.map((item) => (
             <li key={item.texto}><span>{item.icone}</span>{item.texto}</li>
           ))}
         </ul>
         <p className="moldura__nota">
-          Projeto acadêmico. Os pagamentos rodam em ambiente de teste.
+          Projeto acadêmico.
         </p>
       </aside>
 

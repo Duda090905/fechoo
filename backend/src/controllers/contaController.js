@@ -1,6 +1,12 @@
-const { Prestador } = require('../models');
+const { Prestador, SolicitacaoExclusao } = require('../models');
 const { removerFotoPerfil } = require('../servicos/armazenamento');
 const { listarPendencias } = require('../servicos/pendencias');
+const { iniciarPausa, encerrarPausa } = require('../servicos/pausas');
+
+// US04 - registra data (created_at), origem e resultado de cada pedido.
+function registrarSolicitacao(usuarioId, tipo, resultado) {
+  return SolicitacaoExclusao.create({ usuario_id: usuarioId, tipo, origem: 'painel_usuario', resultado });
+}
 
 // US02 - dados da propria conta
 async function meusDados(req, res) {
@@ -21,8 +27,7 @@ async function pendencias(req, res, next) {
  * US04 - Desativar a conta.
  *
  * Nao apaga nada. A conta vira "inativa": some das buscas, perde o acesso,
- * mas o cadastro, o historico e a reputacao continuam guardados. Quem tenta
- * fugir de uma avaliacao ruim criando conta nova esbarra no mesmo CPF.
+ * mas o cadastro e o historico continuam guardados.
  */
 async function desativar(req, res, next) {
   try {
@@ -33,6 +38,7 @@ async function desativar(req, res, next) {
 
     const lista = await listarPendencias(req.usuario.id);
     if (lista.length) {
+      await registrarSolicitacao(req.usuario.id, 'desativacao', 'recusada_pendencia');
       return res.status(409).json({
         erro: 'Voce tem pendencias em aberto. Resolva antes de desativar a conta.',
         pendencias: lista
@@ -46,10 +52,9 @@ async function desativar(req, res, next) {
 
     const prestador = await Prestador.findOne({ where: { usuario_id: usuario.id } });
     if (prestador && prestador.status === 'ativo') {
-      prestador.status = 'pausado';
-      prestador.pausado_em = new Date();
-      await prestador.save();
+      await iniciarPausa(prestador);
     }
+    await registrarSolicitacao(usuario.id, 'desativacao', 'concluida');
 
     return res.json({
       mensagem: 'Conta desativada. Seus dados ficam guardados e voce pode voltar quando quiser.'
@@ -104,6 +109,7 @@ async function excluirDefinitivo(req, res, next) {
 
     const lista = await listarPendencias(usuario.id);
     if (lista.length) {
+      await registrarSolicitacao(usuario.id, 'exclusao_dados', 'recusada_pendencia');
       return res.status(409).json({
         erro: 'Voce tem pendencias em aberto. Resolva antes de apagar seus dados.',
         pendencias: lista
@@ -120,6 +126,7 @@ async function excluirDefinitivo(req, res, next) {
       await prestador.save();
       await prestador.setCategorias([]);
       await prestador.setBairros([]);
+      await encerrarPausa(prestador);
     }
 
     usuario.nome = 'Usuario removido';
@@ -131,6 +138,7 @@ async function excluirDefinitivo(req, res, next) {
     usuario.status = 'excluido';
     usuario.excluido_em = new Date();
     await usuario.save();
+    await registrarSolicitacao(usuario.id, 'exclusao_dados', 'concluida');
 
     return res.json({ mensagem: 'Seus dados pessoais foram apagados. Essa conta nao volta.' });
   } catch (e) {

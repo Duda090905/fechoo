@@ -11,7 +11,7 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | 2. Sessão (US02/US03) | 4, 5, 12 e testes de recuperação | Concluída |
 | 3. Cadastro e perfil no front (US01/US05) | 3, 9, 6 | Concluída |
 | Enxugamento do escopo | Remoção do que não é dos 7 cards | Concluída |
-| 4. Prioridade média (revisada) | 7, 8, 11 e `schema.sql` | Pendente |
+| 4. Prioridade média (revisada) | 7, 8, 11, `schema.sql` e home enxuta | Concluída |
 | 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
 
 ---
@@ -369,3 +369,79 @@ Deixar as colunas antigas no banco também funciona (a aplicação simplesmente 
 - **Em aberto com o cliente:** o prazo de retenção da conta inativa (valor e o que acontece quando vence).
 - **Decisão pendente:** a landing page (`Inicio.jsx`) apresenta Pix retido, disputa, taxa de 8% e histórico, que são de sprints
   futuros. Não foi alterada.
+
+---
+
+## Fase 4: itens finais (US04, US07, US08) e home enxuta
+
+### Item 7. Data e origem do pedido de exclusão (US04)
+
+O Word pede *"registrar data e origem da solicitação"*. Antes só existiam `desativado_em` e `excluido_em`.
+
+- Tabela nova `solicitacoes_exclusao` (modelo `SolicitacaoExclusao`): `usuario_id`, `tipo` (`desativacao` ou `exclusao_dados`),
+  `origem` (hoje só `painel_usuario`), `resultado` (`concluida` ou `recusada_pendencia`) e `created_at`.
+- `contaController.js`: grava um registro em cada pedido. O pedido recusado por haver pendência também fica registrado.
+  Pedido com a confirmação digitada errada ou conta ainda ativa (no caso da exclusão de dados) não é registrado, porque nem chega a ser um pedido válido.
+- O registro guarda só o id do usuário, sem dado pessoal, então sobrevive à anonimização da conta.
+- Não guardei IP nem aparelho: seria dado pessoal além do que o card pede.
+
+### Item 8. Histórico de pausas (US07)
+
+O card pede *"impedir que o tempo pausado conte como demora na resposta"*. Para isso é preciso saber **quando** o perfil esteve pausado, e antes só havia `pausado_em`, que era apagado ao retomar.
+
+- Tabela nova `pausas` (modelo `Pausa`): `prestador_id`, `inicio`, `fim` (vazio = pausa em andamento).
+- `servicos/pausas.js` (novo): `iniciarPausa`, `retomar` e `encerrarPausa`. Pausar pelo botão, desativar a conta e apagar os dados passam por aqui,
+  então o histórico nunca diverge do status.
+- A regra de descontar o tempo de resposta só pode ser aplicada na US10 (solicitação de serviço); aqui fica a base de dados pronta.
+
+### Item 11. Finalidade do filtro entre mulheres (US08)
+
+A README agora registra que a finalidade do filtro é a segurança pessoal de quem recebe alguém em casa, não segmentação comercial.
+
+### `backend/schema.sql` atualizado
+
+Reescrito a partir dos modelos atuais (estava sem `inativo`, `token_versao`, `pausas`, `solicitacoes_exclusao` e com colunas que saíram).
+Validado rodando o script inteiro num banco temporário: cria as 10 tabelas sem erro.
+
+### Home enxuta
+
+A home descrevia Pix retido, orçamento, disputa, taxa de 8%, histórico e avaliações, que são de sprints futuros, e não tinha função além de apresentação.
+Ficou só com o que existe hoje:
+
+- capa com os dois caminhos (preciso de um serviço / quero oferecer meu trabalho);
+- as categorias, que vêm da API;
+- "para quem precisa" e "para quem trabalha", citando apenas o que o sistema faz (perfil completo, filtro entre mulheres, apagar os dados, até 5 serviços e bairros, pausar o perfil);
+- chamada final para criar conta.
+
+Saíram o painel que simulava o pagamento retido, os quatro passos do fluxo, o comparativo, as perguntas frequentes e o CSS correspondente.
+Também foram ajustados a lateral das telas de conta, o rodapé (que apontava para seções que não existem mais) e o título da página, que prometiam "dinheiro garantido".
+Quando o pagamento retido for entregue, a versão completa da home está no histórico do Git (commit anterior a este) e pode voltar.
+
+### Testes
+
+`npm run teste`: **95 critérios, 0 falhas** (eram 89). Novos:
+- cada pausa vira um período com início e fim; pausa em andamento fica com o fim em aberto; o histórico guarda todos os períodos e nenhum fica aberto depois de retomar;
+- o pedido recusado por pendência fica registrado com data e origem; cada pedido concluído fica registrado (2 desativações e 1 exclusão); o registro sobrevive à anonimização.
+
+O build do frontend compila sem erros.
+
+### Arquivos alterados nesta fase
+
+- Backend: `models/Pausa.js`, `models/SolicitacaoExclusao.js` (novos), `models/index.js`, `servicos/pausas.js` (novo),
+  `controllers/contaController.js`, `controllers/prestadorController.js`, `schema.sql`, `testes/criterios.js`
+- Frontend: `paginas/Inicio.jsx`, `paginas/inicio.css`, `componentes/MolduraAuth.jsx`, `componentes/Rodape.jsx`, `componentes/Cabecalho.jsx`, `index.html`
+- `README.md` e `ALTERACOES.md`
+
+### Banco local
+
+As tabelas `pausas` e `solicitacoes_exclusao` foram criadas sozinhas pelo `sequelize.sync()` quando a API reiniciou. Quem tem banco antigo só precisa reiniciar a API.
+
+### Em aberto
+
+- **Prazo de retenção da conta inativa:** falta o valor definido pelo cliente e o que acontece quando ele vence.
+
+### Correção: botão "Criar conta" do cabeçalho
+
+O botão aparecia invisível e só ficava amarelo ao passar o mouse. A regra genérica dos links do menu
+(`.cabecalho__menu a { background: none }`) era mais específica que `.cabecalho__cta` e apagava o fundo, deixando o texto escuro
+sobre o cabeçalho escuro. A regra do botão passou a `.cabecalho .cabecalho__cta` (`cabecalho.css`), o que também corrige o menu do celular.

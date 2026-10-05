@@ -84,9 +84,9 @@ Sobe a API em um banco em memória e verifica os critérios de aceite do sprint,
 
 ## Front-end
 
-A home é uma landing completa: capa com o painel que mostra o dinheiro parado no meio do caminho, os quatro passos do fluxo, o comparativo com as plataformas que só conectam e somem, as categorias vindas da API, os dois públicos e as perguntas frequentes.
+A home é enxuta e só fala do que o sistema faz neste sprint: capa com os dois caminhos (contratar ou oferecer serviço), as categorias vindas da API e um resumo para cada público. Pagamento retido, orçamento e avaliação entram na home quando forem entregues.
 
-As telas de conta (entrar, criar conta, recuperar senha) usam layout de duas colunas no desktop, com uma lateral escura que repete o argumento do produto; no celular a lateral some e sobra só o formulário.
+As telas de conta (entrar, criar conta, recuperar senha) usam layout de duas colunas no desktop, com uma lateral escura que resume o que a plataforma oferece; no celular a lateral some e sobra só o formulário.
 
 Os ícones são SVG escritos à mão em `componentes/Icones.jsx` — o projeto não ganha dependência só por causa de desenho. Toda a paleta e o espaçamento vivem em `estilos/tokens.css`.
 
@@ -112,6 +112,12 @@ Os dois caminhos são bloqueados enquanto houver pendência em aberto.
 **Conta inativa e acesso.** O login de uma conta inativa funciona de propósito: é o único jeito de a pessoa se reativar. O middleware `exigirAtivo` barra todas as demais rotas, então uma conta inativa não mexe no perfil e não aparece em listagem.
 
 **Cadastro com CPF já usado.** A mensagem é sempre a mesma, seja a conta ativa ou inativa: *"Já existe uma conta com esse e-mail ou CPF. Entre com sua senha ou recupere o acesso."* Confirmar para um estranho que determinado CPF tem conta desativada seria vazamento de dado pessoal.
+
+**Registro dos pedidos para sair (US04).** Cada pedido de desativação ou de exclusão dos dados grava data, origem (hoje só o painel do usuário) e resultado (concluído ou recusado por pendência) na tabela `solicitacoes_exclusao`. O registro guarda só o id do usuário, então continua existindo depois que a conta é anonimizada.
+
+**Histórico de pausas (US07).** Cada pausa do perfil vira um período (início e fim) na tabela `pausas`. É o que permitirá descontar o tempo pausado do tempo de resposta quando existirem as solicitações de serviço.
+
+**Telefone.** Obrigatório no cadastro, com DDD, guardado só com os dígitos.
 
 **Foto de perfil (US05).** Enviada como arquivo (JPG, PNG ou WebP, até 2 MB), conferido pelo conteúdo. Fica em `backend/uploads/perfis`, fora do Git; em produção o certo é um armazenamento externo, e a troca mexe só em `src/servicos/armazenamento.js`.
 

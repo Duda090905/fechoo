@@ -149,6 +149,73 @@ async function rodar() {
     corpo: { descricao: 'Pinturas em geral.', categorias: [idsCategorias[2]], bairros: [bairro.id] }
   });
 
+  console.log('\nUS05 - Validacao do perfil');
+  const vazias = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: tokenRita, corpo: { categorias: [] }
+  });
+  checar('recusa esvaziar as categorias', vazias.status === 400);
+
+  const bairrosVazios = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: tokenRita, corpo: { bairros: [] }
+  });
+  checar('recusa esvaziar os bairros', bairrosVazios.status === 400);
+
+  const categoriaFantasma = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: tokenRita, corpo: { categorias: [999999] }
+  });
+  checar('recusa categoria que nao existe, com mensagem clara',
+    categoriaFantasma.status === 400 && /categoria/i.test(categoriaFantasma.dados.erro || ''));
+
+  const bairroFantasma = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: tokenRita, corpo: { bairros: [999999] }
+  });
+  checar('recusa bairro que nao existe, com mensagem clara',
+    bairroFantasma.status === 400 && /bairro/i.test(bairroFantasma.dados.erro || ''));
+
+  const aindaIntacto = await chamar('/prestadores/meu-perfil', { token: tokenRita });
+  checar('perfil recusado nao altera o que estava salvo',
+    aindaIntacto.dados.prestador.categorias.length === 2 && aindaIntacto.dados.prestador.bairros.length === 1);
+
+  // Prestadores incompletos: nao podem aparecer em nenhuma busca.
+  const SEM_CATEGORIA = {
+    nome: 'Paulo Sem Categoria', cpf: '39053344705', email: 'paulo@teste.com',
+    senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'masculino', aceite_termos: true
+  };
+  const SEM_BAIRRO = {
+    nome: 'Bia Sem Bairro', cpf: '86288366757', email: 'bia@teste.com',
+    senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'feminino', aceite_termos: true
+  };
+  const cadSemCategoria = await chamar('/auth/register', { metodo: 'POST', corpo: SEM_CATEGORIA });
+  const cadSemBairro = await chamar('/auth/register', { metodo: 'POST', corpo: SEM_BAIRRO });
+
+  const soBairro = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: cadSemCategoria.dados.token, corpo: { descricao: 'Ainda sem categoria.', bairros: [bairro.id] }
+  });
+  checar('permite salvar o perfil aos poucos (so bairro)', soBairro.status === 200);
+
+  const repetidas = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: cadSemBairro.dados.token,
+    corpo: { descricao: 'Ainda sem bairro.', categorias: Array(6).fill(idsCategorias[0]) }
+  });
+  checar('categoria repetida conta uma vez so, nao estoura o limite',
+    repetidas.status === 200 && repetidas.dados.prestador.categorias.length === 1);
+
+  const nomesSemFiltro = (await chamar('/prestadores')).dados.prestadores.map((p) => p.nome);
+  checar('prestador sem categoria nao aparece na listagem', !nomesSemFiltro.includes(SEM_CATEGORIA.nome));
+  checar('prestador sem bairro nao aparece na listagem', !nomesSemFiltro.includes(SEM_BAIRRO.nome));
+
+  const nomesPorCategoria = (await chamar(`/prestadores?categoria=${idsCategorias[0]}`)).dados.prestadores.map((p) => p.nome);
+  checar('prestador sem bairro nao aparece nem filtrando pela categoria dele',
+    !nomesPorCategoria.includes(SEM_BAIRRO.nome));
+
+  const nomesPorBairro = (await chamar(`/prestadores?bairro=${bairro.id}`)).dados.prestadores.map((p) => p.nome);
+  checar('prestador sem categoria nao aparece nem filtrando pelo bairro dele',
+    !nomesPorBairro.includes(SEM_CATEGORIA.nome));
+
+  const filtrada = (await chamar(`/prestadores?categoria=${idsCategorias[0]}`)).dados.prestadores;
+  checar('filtrar por categoria nao esconde as outras categorias do cartao',
+    filtrada.length === 1 && filtrada[0].categorias.length === 2);
+
   console.log('\nUS07 - Pausar perfil');
   const antesDaPausa = await chamar('/prestadores');
   checar('listagem mostra os dois prestadores ativos', antesDaPausa.dados.prestadores.length === 2);

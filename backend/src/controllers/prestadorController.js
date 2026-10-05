@@ -37,13 +37,45 @@ async function meuPerfil(req, res, next) {
   }
 }
 
+// Aceita so lista de numeros inteiros positivos, sem repeticao.
+// Devolve null quando o valor nao e uma lista valida.
+function listaDeIds(valor) {
+  if (!Array.isArray(valor)) return null;
+  const ids = valor.map(Number);
+  if (ids.some((id) => !Number.isInteger(id) || id <= 0)) return null;
+  return [...new Set(ids)];
+}
+
 // US05 / US08 - criar ou atualizar o perfil
 async function salvarPerfil(req, res, next) {
   try {
-    const { descricao, foto_url, categorias = [], bairros = [], atende_apenas_mulheres } = req.body;
+    const { descricao, foto_url, atende_apenas_mulheres } = req.body;
 
-    if (categorias.length > LIMITE_CATEGORIAS) {
-      return res.status(400).json({ erro: `Escolha no maximo ${LIMITE_CATEGORIAS} categorias.` });
+    // Campo ausente = nao mexe. Campo enviado = substitui a lista inteira,
+    // e a lista nao pode ficar vazia (sem categoria ou bairro o prestador
+    // nao seria encontrado por ninguem).
+    let categorias;
+    let bairros;
+
+    if (req.body.categorias !== undefined) {
+      categorias = listaDeIds(req.body.categorias);
+      if (!categorias) return res.status(400).json({ erro: 'Lista de categorias invalida.' });
+      if (!categorias.length) return res.status(400).json({ erro: 'Escolha ao menos uma categoria.' });
+      if (categorias.length > LIMITE_CATEGORIAS) {
+        return res.status(400).json({ erro: `Escolha no maximo ${LIMITE_CATEGORIAS} categorias.` });
+      }
+      if (await Categoria.count({ where: { id: categorias } }) !== categorias.length) {
+        return res.status(400).json({ erro: 'Alguma das categorias escolhidas nao existe.' });
+      }
+    }
+
+    if (req.body.bairros !== undefined) {
+      bairros = listaDeIds(req.body.bairros);
+      if (!bairros) return res.status(400).json({ erro: 'Lista de bairros invalida.' });
+      if (!bairros.length) return res.status(400).json({ erro: 'Escolha ao menos um bairro.' });
+      if (await Bairro.count({ where: { id: bairros } }) !== bairros.length) {
+        return res.status(400).json({ erro: 'Algum dos bairros escolhidos nao existe.' });
+      }
     }
 
     // US08 - so quem se identificou como mulher pode marcar a opcao.
@@ -65,8 +97,8 @@ async function salvarPerfil(req, res, next) {
     }
     await prestador.save();
 
-    if (categorias.length) await prestador.setCategorias(categorias);
-    if (bairros.length) await prestador.setBairros(bairros);
+    if (categorias) await prestador.setCategorias(categorias);
+    if (bairros) await prestador.setBairros(bairros);
 
     const atualizado = await Prestador.findByPk(prestador.id, { include: INCLUDES });
     return res.json({ prestador: montarPerfil(atualizado) });
@@ -108,30 +140,33 @@ async function listar(req, res, next) {
   try {
     const { categoria, bairro, somente_mulheres } = req.query;
 
-    const where = { status: 'ativo' };
-    const include = [
-      { model: Usuario, as: 'usuario', attributes: ['nome', 'sexo'], where: { status: 'ativo' } },
-      {
-        model: Categoria,
-        as: 'categorias',
-        attributes: ['id', 'nome'],
-        through: { attributes: [] },
-        ...(categoria ? { where: { id: categoria } } : {})
-      },
-      {
-        model: Bairro,
-        as: 'bairros',
-        attributes: ['id', 'nome'],
-        through: { attributes: [] },
-        ...(bairro ? { where: { id: bairro } } : {})
-      }
-    ];
+    const usuarioWhere = { status: 'ativo' };
+    if (somente_mulheres === 'true') usuarioWhere.sexo = 'feminino';
 
-    if (somente_mulheres === 'true') {
-      include[0].where = { ...include[0].where, sexo: 'feminino' };
-    }
+    // Passo 1: descobre quem entra. required: true em tudo, entao prestador
+    // sem categoria, sem bairro ou fora do filtro nao passa.
+    const elegiveis = await Prestador.findAll({
+      attributes: ['id'],
+      where: { status: 'ativo' },
+      include: [
+        { model: Usuario, as: 'usuario', attributes: [], where: usuarioWhere, required: true },
+        {
+          model: Categoria, as: 'categorias', attributes: [], through: { attributes: [] },
+          required: true, ...(categoria ? { where: { id: categoria } } : {})
+        },
+        {
+          model: Bairro, as: 'bairros', attributes: [], through: { attributes: [] },
+          required: true, ...(bairro ? { where: { id: bairro } } : {})
+        }
+      ]
+    });
+    const ids = [...new Set(elegiveis.map((p) => p.id))];
 
-    const prestadores = await Prestador.findAll({ where, include });
+    // Passo 2: carrega o perfil completo. Assim o cartao mostra todas as
+    // categorias e bairros, e nao so a que casou com o filtro.
+    const prestadores = ids.length
+      ? await Prestador.findAll({ where: { id: ids }, include: INCLUDES, order: [['id', 'ASC']] })
+      : [];
     return res.json({ prestadores: prestadores.map(montarPerfil) });
   } catch (e) {
     return next(e);

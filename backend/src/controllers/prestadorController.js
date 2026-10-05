@@ -1,4 +1,5 @@
 const { Prestador, Usuario, Categoria, Bairro } = require('../models');
+const { detectarTipo, salvarFotoPerfil, removerFotoPerfil, urlPublica } = require('../servicos/armazenamento');
 
 const LIMITE_CATEGORIAS = 5;
 
@@ -8,7 +9,7 @@ function montarPerfil(prestador) {
     nome: prestador.usuario ? prestador.usuario.nome : null,
     sexo: prestador.usuario ? prestador.usuario.sexo : null,
     descricao: prestador.descricao,
-    foto_url: prestador.foto_url,
+    foto_url: urlPublica(prestador.foto_url),
     status: prestador.status,
     verificado: prestador.verificado,
     atende_apenas_mulheres: prestador.atende_apenas_mulheres,
@@ -49,7 +50,8 @@ function listaDeIds(valor) {
 // US05 / US08 - criar ou atualizar o perfil
 async function salvarPerfil(req, res, next) {
   try {
-    const { descricao, foto_url, atende_apenas_mulheres } = req.body;
+    // A foto nao passa por aqui: tem endpoint proprio (PUT/DELETE /prestadores/foto).
+    const { descricao, atende_apenas_mulheres } = req.body;
 
     // Campo ausente = nao mexe. Campo enviado = substitui a lista inteira,
     // e a lista nao pode ficar vazia (sem categoria ou bairro o prestador
@@ -91,7 +93,6 @@ async function salvarPerfil(req, res, next) {
     });
 
     prestador.descricao = descricao ?? prestador.descricao;
-    prestador.foto_url = foto_url ?? prestador.foto_url;
     if (atende_apenas_mulheres !== undefined) {
       prestador.atende_apenas_mulheres = Boolean(atende_apenas_mulheres);
     }
@@ -102,6 +103,54 @@ async function salvarPerfil(req, res, next) {
 
     const atualizado = await Prestador.findByPk(prestador.id, { include: INCLUDES });
     return res.json({ prestador: montarPerfil(atualizado) });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+// US05 - enviar ou trocar a foto de perfil (multipart, campo "foto")
+async function enviarFoto(req, res, next) {
+  let novaUrl = null;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ erro: 'Escolha uma imagem para enviar.' });
+    }
+    const tipo = detectarTipo(req.file.buffer);
+    if (!tipo) {
+      return res.status(400).json({ erro: 'Use uma imagem JPG, PNG ou WebP.' });
+    }
+
+    const [prestador] = await Prestador.findOrCreate({
+      where: { usuario_id: req.usuario.id },
+      defaults: { usuario_id: req.usuario.id }
+    });
+
+    const antiga = prestador.foto_url;
+    novaUrl = await salvarFotoPerfil(req.file.buffer, tipo.ext);
+    prestador.foto_url = novaUrl;
+    await prestador.save();
+    novaUrl = null; // gravada no banco: nao precisa desfazer
+
+    await removerFotoPerfil(antiga);
+    return res.json({ foto_url: prestador.foto_url });
+  } catch (e) {
+    // Se o banco falhou depois de gravar o arquivo, nao deixa arquivo orfao.
+    if (novaUrl) await removerFotoPerfil(novaUrl).catch(() => {});
+    return next(e);
+  }
+}
+
+// US05 - remover a foto de perfil
+async function removerFoto(req, res, next) {
+  try {
+    const prestador = await Prestador.findOne({ where: { usuario_id: req.usuario.id } });
+    if (prestador && prestador.foto_url) {
+      const antiga = prestador.foto_url;
+      prestador.foto_url = null;
+      await prestador.save();
+      await removerFotoPerfil(antiga);
+    }
+    return res.json({ foto_url: null });
   } catch (e) {
     return next(e);
   }
@@ -173,4 +222,4 @@ async function listar(req, res, next) {
   }
 }
 
-module.exports = { meuPerfil, salvarPerfil, alternarPausa, listar };
+module.exports = { meuPerfil, salvarPerfil, enviarFoto, removerFoto, alternarPausa, listar };

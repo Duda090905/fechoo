@@ -3,6 +3,7 @@ import { api } from '../servicos/api';
 import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
+import Avatar from '../componentes/Avatar';
 import { IconeEscudo, IconeBusca } from '../componentes/Icones';
 import './prestadores.css';
 
@@ -155,7 +156,7 @@ export default function Prestadores() {
         {!carregando && prestadores.map((p) => (
           <article className="ficha" key={p.id}>
             <div className="ficha__topo">
-              <span className="ficha__avatar">{(p.nome || '?').trim().charAt(0).toUpperCase()}</span>
+              <Avatar nome={p.nome} foto={p.foto_url} />
               <div style={{ minWidth: 0 }}>
                 <h2 className="ficha__nome">{p.nome}</h2>
                 <div className="ficha__selos">

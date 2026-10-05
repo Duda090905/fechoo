@@ -9,7 +9,7 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 |---|---|---|
 | 1. Busca e perfil (US05) | 1, 2 e testes | Concluída |
 | 2. Sessão (US02/US03) | 4, 5, 12 e testes de recuperação | Concluída |
-| 3. Cadastro e perfil no front (US01/US05) | 3, 9, 6 | Pendente |
+| 3. Cadastro e perfil no front (US01/US05) | 3, 9, 6 | Concluída |
 | 4. Prioridade média | 7, 8, 10, 11 | Pendente |
 | 5. Endurecimento | 13, 14, restante do 15 | Pendente |
 
@@ -173,3 +173,124 @@ O build do frontend (`vite build`) compila sem erros.
 `cpf_hash`, `conta_anterior_id`, `bloqueado_novo_cadastro`, `desativado_em`, `reativado_em` e agora `token_versao`).
 A aplicação não depende dele, mas quem criar o banco por esse arquivo terá um esquema incompleto.
 Sugestão: atualizar na Fase 4 ou 5.
+---
+
+## Fase 3: Cadastro e perfil no front (US01 e US05)
+
+### Item 3. CPF validado antes do envio, com máscara (US01)
+
+**Problema.** O critério diz *"CPF inválido é recusado antes do envio"*, mas a tela só mandava o valor para a API.
+
+**Como ficou.**
+- `frontend/src/utils/formatos.js` (novo): `formatarCpf`, `cpfValido` (mesma conta de dígitos verificadores do backend), `formatarTelefone`, `telefoneValido`.
+- `frontend/src/paginas/CriarConta.jsx`:
+  - o CPF ganha máscara `000.000.000-00` enquanto se digita;
+  - ao sair do campo, um CPF inválido mostra "Esse CPF não é válido." embaixo do campo;
+  - ao enviar, CPF ou telefone inválidos barram o envio com mensagem, sem chamar a API.
+
+### Item 9. E-mail, telefone e nome tratados no backend (US01)
+
+**Problema.** `Ana@x.com` e `ana@x.com` viravam contas diferentes; e-mail e telefone não eram validados; nome com espaços sobrando era gravado como veio.
+
+**Como ficou.**
+- `backend/src/utils/contato.js` (novo): `normalizarEmail` (sem espaços, minúsculas), `emailValido`, `normalizarTelefone`, `fotoValida`.
+- `authController.js`:
+  - cadastro, login e "esqueci a senha" usam o e-mail normalizado;
+  - e-mail sem formato válido: 400 "Esse e-mail nao parece valido.";
+  - telefone, quando informado, precisa ter DDD + 8 ou 9 dígitos (10 ou 11 dígitos); é gravado só com os dígitos;
+  - nome é aparado e limitado a 120 caracteres.
+- `contaController.js` (`PUT /conta`): mesma validação de telefone e de nome.
+- `frontend/src/paginas/MinhaConta.jsx`: telefone mostrado e editado com máscara `(19) 99999-9999`.
+
+**Telefone obrigatório.** O texto da US01 diz "informando nome, CPF, e-mail, telefone e senha", então o telefone passou de opcional a obrigatório:
+- `POST /auth/register` sem telefone ou com telefone em branco devolve 400;
+- `PUT /conta` não deixa apagar o telefone (400), só trocá-lo por outro válido;
+- o campo é `required` em **Criar conta** e em **Minha conta**, e `telefoneValido` no front deixou de aceitar vazio.
+**Dados antigos.** Contas criadas antes, sem telefone, continuam entrando normalmente; o telefone só passa a ser exigido quando a pessoa editar os dados em **Minha conta**. No MySQL, a comparação de e-mail já ignora maiúsculas (collation `utf8mb4_unicode_ci`), então contas criadas antes continuam entrando.
+Telefones antigos gravados com máscara continuam aparecendo normalmente, porque o front só usa os dígitos.
+
+### Item 6. Foto do perfil com upload de imagem (US05)
+
+**Problema.** A tela de edição do perfil não tinha campo de foto. A primeira versão usava o link de uma imagem, mas
+na prática a pessoa cola o link de uma *página* (por exemplo, um artigo da Wikipédia) e nada aparece: o navegador
+recebe HTML em vez de imagem. Link também depende de site de terceiros e faz quem vê o perfil carregar imagem de fora.
+Por isso a foto passou a ser **enviada como arquivo**, e o campo de link foi removido.
+
+**Como ficou (backend).**
+- `PUT /api/prestadores/foto` (multipart, campo `foto`) e `DELETE /api/prestadores/foto`. Só para prestador com conta ativa.
+- `servicos/armazenamento.js` (novo): grava em `backend/uploads/perfis/` (ou `UPLOADS_DIR`) com nome aleatório.
+  É o único arquivo que sabe onde as fotos ficam; trocar por S3 ou similar mexe só nele.
+- `middlewares/upload.js` (novo): `multer` em memória, limite de 2 MB. Acima disso, 413.
+- O formato é conferido pelos **primeiros bytes** do arquivo (JPG, PNG ou WebP), não pelo nome nem pelo tipo informado pelo navegador.
+  SVG é recusado, porque pode carregar script. Nada é gravado em disco antes dessa conferência.
+- Trocar a foto apaga a antiga do disco. Remover a foto apaga o arquivo.
+- **US04 / LGPD:** apagar os dados da conta agora remove também o arquivo da foto, não só o campo no banco.
+  Desativar a conta mantém a foto (os dados ficam guardados).
+- `app.js`: `/uploads` é servido com `X-Content-Type-Options: nosniff` e `Cross-Origin-Resource-Policy: cross-origin`
+  (o front roda em outra porta). `backend/.gitignore` ignora `uploads`.
+- `PUT /prestadores/meu-perfil` não aceita mais `foto_url`: a foto só entra pelo upload.
+- A API só devolve `foto_url` quando o arquivo é do nosso armazenamento. Links externos gravados na primeira versão ficam invisíveis.
+- Nova dependência: `multer` (versão 2).
+
+**Como ficou (frontend).**
+- `MeuPerfil.jsx`: botões **Escolher foto / Trocar foto / Remover**, com prévia imediata da imagem escolhida.
+  A foto só é enviada ao clicar em **Salvar alterações**, para manter a regra "nada muda até você salvar".
+  O front já recusa arquivo que não seja JPG, PNG ou WebP, ou com mais de 2 MB, antes de enviar.
+  Se o perfil salvar mas a foto falhar, a tela avisa que o perfil foi salvo e que a foto não foi atualizada.
+- `servicos/api.js`: suporte a envio de arquivo (`FormData`), `enviarFoto`, `removerFoto` e `urlDaFoto` (monta o endereço completo).
+- `componentes/Avatar.jsx`: mostra a foto ou, se não houver ou falhar, a inicial do nome. Usado no perfil e nos cartões de **Profissionais**.
+- Perfil começado pela metade (por exemplo, só a descrição) volta a abrir a edição com o que já estava salvo.
+
+**Limites conhecidos.**
+- Guardar em disco serve para desenvolvimento e para a apresentação. Em hospedagem real o disco costuma ser descartado a
+  cada deploy; o certo é um armazenamento externo, e o módulo `armazenamento.js` já isola essa troca.
+- A imagem não é redimensionada nem recodificada: 2 MB é o teto. Um redimensionamento (por exemplo, com `sharp`) pode vir depois.
+- Documentos de identidade da US06 **não** devem passar por esse módulo (o requisito é nunca guardar a imagem do documento).
+- Quem testou a primeira versão e gravou um link de foto no banco: o valor continua na coluna `foto_url`, mas a API o ignora.
+
+### Testes
+
+`backend/testes/criterios.js`: **102 critérios no total** (eram 71 ao fim da Fase 2). Os novos falhavam antes da implementação.
+Os testes usam uma pasta temporária para as fotos, nunca `backend/uploads`.
+
+Cadastro (US01):
+- e-mail inválido, telefone inválido, telefone ausente e telefone em branco são recusados
+- e-mail repetido só com maiúsculas é recusado (409)
+- cadastro com CPF mascarado, e-mail com espaços e maiúsculas, nome com espaços e telefone com máscara
+- login não diferencia maiúsculas no e-mail
+- não dá para apagar o telefone ao editar a conta; trocar o telefone guarda só os dígitos
+
+Foto (US05 e US04):
+- recusa envio sem arquivo, texto disfarçado de PNG, SVG e arquivo acima de 2 MB
+- contratante não envia foto (403) e envio sem login é recusado (401)
+- aceita PNG, devolve o endereço, e a foto abre como `image/png` com `nosniff`
+- salvar o perfil sem foto não apaga a foto; link externo não é mais aceito
+- trocar por JPEG apaga o arquivo antigo; remover apaga o arquivo e limpa o perfil; remover sem foto não dá erro
+- desativar a conta mantém a foto; apagar os dados da conta remove o arquivo do disco
+
+Conferido também na API real (MySQL), com `curl.exe` enviando arquivo de verdade: upload, abertura da foto com os headers certos,
+texto disfarçado recusado e remoção. A conta de teste foi apagada no fim. O build do frontend compila sem erros.
+Não há testes automatizados do front; a parte visual precisa ser vista no navegador.
+
+### Arquivos alterados na fase 3
+
+Backend:
+- `src/utils/contato.js` (novo), `src/servicos/armazenamento.js` (novo), `src/middlewares/upload.js` (novo)
+- `src/controllers/authController.js`, `contaController.js`, `prestadorController.js`
+- `src/routes/index.js`, `src/app.js`
+- `testes/criterios.js`, `.gitignore`, `package.json`, `package-lock.json` (multer)
+
+Frontend:
+- `src/utils/formatos.js` (novo), `src/componentes/Avatar.jsx` e `avatar.css` (novos)
+- `src/servicos/api.js`
+- `src/paginas/CriarConta.jsx`, `MinhaConta.jsx`, `MeuPerfil.jsx`, `Prestadores.jsx`, `painel.css`
+
+### Como conferir à mão
+
+1. **Criar conta**: digite um CPF errado (por exemplo `111.111.111-11`) e saia do campo: aparece o erro embaixo. Tente enviar: nada é mandado à API.
+2. Digite o CPF `529.982.247-25`: a máscara aparece sozinha, sem erro. O telefone também ganha a máscara e é obrigatório.
+3. Crie a conta com o e-mail `Teste@Exemplo.COM` e entre depois com `teste@exemplo.com`: funciona.
+4. **Meu perfil** (conta de prestador): clique em **Escolher foto** e selecione uma imagem JPG, PNG ou WebP do computador.
+   A prévia aparece na hora. Clique em **Salvar alterações**: a foto aparece no perfil e em **Profissionais**.
+5. Escolha um arquivo que não seja imagem (por exemplo, um `.pdf`) ou uma imagem acima de 2 MB: o erro aparece antes de enviar.
+6. Clique em **Remover** e salve: a foto some e volta a inicial do nome. O arquivo também some da pasta `backend/uploads/perfis`.

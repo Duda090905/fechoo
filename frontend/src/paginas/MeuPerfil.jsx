@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../servicos/api';
 import { useAuth } from '../contexto/AuthContexto';
 import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
 import Selecao from '../componentes/Selecao';
+import Avatar from '../componentes/Avatar';
 import { IconeEscudo, IconeBusca } from '../componentes/Icones';
 import './painel.css';
 
 const LIMITE = 5;
-const VAZIO = { descricao: '', categorias: [], bairros: [], atende_apenas_mulheres: false };
+const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
+const LIMITE_FOTO_MB = 2;
+const VAZIO = { descricao: '', foto_url: '', categorias: [], bairros: [], atende_apenas_mulheres: false };
 
 export default function MeuPerfil() {
   const { usuario } = useAuth();
@@ -24,6 +27,13 @@ export default function MeuPerfil() {
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  // Foto: só é enviada ao salvar. Até lá fica aqui, com prévia local.
+  const [arquivoFoto, setArquivoFoto] = useState(null);
+  const [previa, setPrevia] = useState('');
+  const [removerFoto, setRemoverFoto] = useState(false);
+  const campoArquivo = useRef(null);
+
+  useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
   useEffect(() => {
     async function carregar() {
@@ -35,19 +45,22 @@ export default function MeuPerfil() {
         setBairros(dadosBairros.bairros || []);
 
         const p = dadosPerfil.prestador;
+        const salvo = p && {
+          descricao: p.descricao || '',
+          foto_url: p.foto_url || '',
+          categorias: p.categorias.map((c) => c.id),
+          bairros: p.bairros.map((b) => b.id),
+          atende_apenas_mulheres: p.atende_apenas_mulheres
+        };
         if (p && p.categorias.length) {
-          const salvo = {
-            descricao: p.descricao || '',
-            categorias: p.categorias.map((c) => c.id),
-            bairros: p.bairros.map((b) => b.id),
-            atende_apenas_mulheres: p.atende_apenas_mulheres
-          };
           setPerfil(salvo);
           setRascunho(salvo);
           setStatus(p.status);
           setTemPerfil(true);
         } else {
-          // Perfil ainda não montado: já abre em modo de edição.
+          // Perfil ainda não montado: já abre em modo de edição,
+          // aproveitando o que já tiver sido preenchido.
+          if (salvo) setRascunho(salvo);
           setEditando(true);
         }
       } catch (e) {
@@ -69,7 +82,38 @@ export default function MeuPerfil() {
     });
   }
 
+  function descartarFotoPendente() {
+    setArquivoFoto(null);
+    setPrevia('');
+    setRemoverFoto(false);
+  }
+
+  function escolherFoto(evento) {
+    const arquivo = evento.target.files && evento.target.files[0];
+    evento.target.value = '';
+    if (!arquivo) return;
+    if (!TIPOS_FOTO.includes(arquivo.type)) {
+      setErro('Use uma imagem JPG, PNG ou WebP.');
+      return;
+    }
+    if (arquivo.size > LIMITE_FOTO_MB * 1024 * 1024) {
+      setErro(`A foto pode ter no máximo ${LIMITE_FOTO_MB} MB.`);
+      return;
+    }
+    setErro('');
+    setArquivoFoto(arquivo);
+    setPrevia(URL.createObjectURL(arquivo));
+    setRemoverFoto(false);
+  }
+
+  function tirarFoto() {
+    setArquivoFoto(null);
+    setPrevia('');
+    setRemoverFoto(true);
+  }
+
   function comecarEdicao() {
+    descartarFotoPendente();
     setRascunho(perfil);
     setMensagem('');
     setErro('');
@@ -77,6 +121,7 @@ export default function MeuPerfil() {
   }
 
   function cancelar() {
+    descartarFotoPendente();
     setRascunho(perfil);
     setErro('');
     setEditando(false);
@@ -91,11 +136,31 @@ export default function MeuPerfil() {
 
     setSalvando(true);
     try {
-      await api.salvarPerfil(rascunho);
-      setPerfil(rascunho);
+      // A foto tem endpoint próprio; o perfil vai sem ela.
+      const { foto_url: fotoAtual, ...semFoto } = rascunho;
+      await api.salvarPerfil(semFoto);
+
+      let fotoFinal = fotoAtual;
+      let avisoFoto = '';
+      try {
+        if (arquivoFoto) {
+          fotoFinal = (await api.enviarFoto(arquivoFoto)).foto_url;
+        } else if (removerFoto && fotoAtual) {
+          await api.removerFoto();
+          fotoFinal = '';
+        }
+      } catch (e) {
+        avisoFoto = e.message;
+      }
+
+      const salvoAgora = { ...rascunho, foto_url: fotoFinal || '' };
+      setRascunho(salvoAgora);
+      setPerfil(salvoAgora);
       setTemPerfil(true);
       setEditando(false);
-      setMensagem('Perfil atualizado.');
+      descartarFotoPendente();
+      if (avisoFoto) setErro(`Perfil salvo, mas a foto não foi atualizada: ${avisoFoto}`);
+      else setMensagem('Perfil atualizado.');
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -146,7 +211,7 @@ export default function MeuPerfil() {
         <>
           <div className="cartao cartao--perfil">
             <div className="perfil-capa">
-              <span className="ficha__avatar">{(usuario?.nome || '?').trim().charAt(0).toUpperCase()}</span>
+              <Avatar nome={usuario?.nome} foto={perfil.foto_url} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2 style={{ margin: '0 0 4px' }}>{usuario?.nome}</h2>
                 <p style={{ margin: 0, color: 'var(--texto-claro)', fontSize: 14.5 }}>
@@ -204,6 +269,30 @@ export default function MeuPerfil() {
         <form onSubmit={salvar}>
           <div className="cartao">
             <h2>Sobre o seu trabalho</h2>
+            <div className="foto-editor">
+              <Avatar nome={usuario?.nome} foto={previa || (removerFoto ? '' : rascunho.foto_url)} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span className="campo__etiqueta">Foto de perfil</span>
+                <input
+                  ref={campoArquivo}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={escolherFoto}
+                  hidden
+                />
+                <div className="empilha" style={{ marginTop: 6 }}>
+                  <Botao tipo="secundario" className="botao--curto" type="button" onClick={() => campoArquivo.current?.click()}>
+                    {previa || (rascunho.foto_url && !removerFoto) ? 'Trocar foto' : 'Escolher foto'}
+                  </Botao>
+                  {(previa || (rascunho.foto_url && !removerFoto)) && (
+                    <Botao tipo="texto" type="button" onClick={tirarFoto}>Remover</Botao>
+                  )}
+                </div>
+                <span className="campo__ajuda" style={{ display: 'block', marginTop: 6 }}>
+                  JPG, PNG ou WebP, até {LIMITE_FOTO_MB} MB. A foto só é enviada quando você salvar.
+                </span>
+              </div>
+            </div>
             <Campo etiqueta="Descrição">
               <textarea
                 value={rascunho.descricao}

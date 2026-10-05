@@ -4,6 +4,7 @@ const { cpfValido, limpar, impressaoCpf } = require('../utils/cpf');
 const { senhaForte, gerarHash, conferir, REGRA } = require('../utils/senha');
 const { gerarJWT, gerarTokenRecuperacao, hashDeToken } = require('../utils/token');
 const { enviarLinkRecuperacao } = require('../utils/email');
+const { normalizarEmail, emailValido, normalizarTelefone } = require('../utils/contato');
 
 const MAX_TENTATIVAS = 5;
 const MINUTOS_BLOQUEIO = 15;
@@ -12,10 +13,23 @@ const MINUTOS_TOKEN = 30;
 // US01 - Cadastro
 async function cadastrar(req, res, next) {
   try {
-    const { nome, cpf, email, telefone, senha, tipo_perfil, sexo, aceite_termos } = req.body;
+    const { cpf, senha, tipo_perfil, sexo, aceite_termos } = req.body;
+    const nome = String(req.body.nome || '').trim();
+    const email = normalizarEmail(req.body.email);
 
     if (!nome || !email || !senha || !tipo_perfil) {
       return res.status(400).json({ erro: 'Preencha nome, e-mail, senha e tipo de perfil.' });
+    }
+    if (nome.length > 120) {
+      return res.status(400).json({ erro: 'O nome pode ter no maximo 120 caracteres.' });
+    }
+    if (!emailValido(email)) {
+      return res.status(400).json({ erro: 'Esse e-mail nao parece valido.' });
+    }
+    const telefone = normalizarTelefone(req.body.telefone);
+    // Obrigatorio: a US01 pede nome, CPF, e-mail, telefone e senha.
+    if (!telefone) {
+      return res.status(400).json({ erro: 'Informe o telefone com DDD, por exemplo (19) 99999-9999.' });
     }
     if (!['contratante', 'prestador'].includes(tipo_perfil)) {
       return res.status(400).json({ erro: 'Escolha entre contratante e prestador.' });
@@ -90,7 +104,8 @@ async function cadastrar(req, res, next) {
 // US02 - Login
 async function entrar(req, res, next) {
   try {
-    const { email, senha } = req.body;
+    const { senha } = req.body;
+    const email = normalizarEmail(req.body.email);
     const generico = { erro: 'E-mail ou senha incorretos.' };
 
     const usuario = await Usuario.findOne({ where: { email } });
@@ -134,7 +149,7 @@ async function entrar(req, res, next) {
 // US03 - Pedir o link
 async function esqueciSenha(req, res, next) {
   try {
-    const { email } = req.body;
+    const email = normalizarEmail(req.body.email);
     // Resposta sempre igual: nao revela se a conta existe.
     const resposta = { mensagem: 'Se existir uma conta com esse e-mail, o link chega em instantes.' };
 

@@ -1,5 +1,7 @@
 const { Prestador } = require('../models');
 const { impressaoCpf } = require('../utils/cpf');
+const { normalizarTelefone } = require('../utils/contato');
+const { removerFotoPerfil } = require('../servicos/armazenamento');
 const { listarPendencias } = require('../servicos/pendencias');
 
 // US02 - dados da propria conta
@@ -10,11 +12,23 @@ async function meusDados(req, res) {
 // US01 - edicao dos dados cadastrais
 async function atualizar(req, res, next) {
   try {
-    const { nome, telefone, sexo } = req.body;
+    const { sexo } = req.body;
+    const nome = String(req.body.nome || '').trim();
     const usuario = req.usuario;
 
+    if (nome.length > 120) {
+      return res.status(400).json({ erro: 'O nome pode ter no maximo 120 caracteres.' });
+    }
+    if (req.body.telefone !== undefined) {
+      const telefone = normalizarTelefone(req.body.telefone);
+      // Obrigatorio tambem na edicao: nao da para apagar o telefone.
+      if (!telefone) {
+        return res.status(400).json({ erro: 'Informe o telefone com DDD, por exemplo (19) 99999-9999.' });
+      }
+      usuario.telefone = telefone;
+    }
+
     if (nome) usuario.nome = nome;
-    if (telefone !== undefined) usuario.telefone = telefone;
     if (sexo) usuario.sexo = sexo;
     await usuario.save();
 
@@ -131,6 +145,8 @@ async function excluirDefinitivo(req, res, next) {
 
     const prestador = await Prestador.findOne({ where: { usuario_id: usuario.id } });
     if (prestador) {
+      // A foto e dado pessoal: some do disco, nao so do banco.
+      await removerFotoPerfil(prestador.foto_url);
       prestador.status = 'suspenso';
       prestador.descricao = null;
       prestador.foto_url = null;

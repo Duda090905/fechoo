@@ -6,6 +6,7 @@ import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
 import MolduraAuth from '../componentes/MolduraAuth';
+import { cpfValido, formatarCpf, formatarTelefone, telefoneValido } from '../utils/formatos';
 
 const INICIAL = {
   nome: '', cpf: '', email: '', telefone: '',
@@ -18,6 +19,7 @@ export default function CriarConta() {
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [cpfTocado, setCpfTocado] = useState(false);
   const { autenticar } = useAuth();
   const navegar = useNavigate();
 
@@ -29,6 +31,15 @@ export default function CriarConta() {
     evento.preventDefault();
     setErro('');
 
+    if (!cpfValido(form.cpf)) {
+      setErro('Esse CPF não é válido. Confira os números.');
+      setCpfTocado(true);
+      return;
+    }
+    if (!telefoneValido(form.telefone)) {
+      setErro('Informe o telefone com DDD, por exemplo (19) 99999-9999.');
+      return;
+    }
     if (form.senha !== form.confirmacao) {
       setErro('As duas senhas precisam ser iguais.');
       return;
@@ -79,9 +90,27 @@ export default function CriarConta() {
         </Campo>
 
         <Campo etiqueta="Nome completo" value={form.nome} onChange={(e) => mudar('nome', e.target.value)} required />
-        <Campo etiqueta="CPF" value={form.cpf} onChange={(e) => mudar('cpf', e.target.value)} inputMode="numeric" placeholder="Só os números" required />
+        <Campo
+          etiqueta="CPF"
+          value={form.cpf}
+          onChange={(e) => mudar('cpf', formatarCpf(e.target.value))}
+          onBlur={() => setCpfTocado(true)}
+          erro={cpfTocado && form.cpf && !cpfValido(form.cpf) ? 'Esse CPF não é válido.' : ''}
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          autoComplete="off"
+          required
+        />
         <Campo etiqueta="E-mail" type="email" value={form.email} onChange={(e) => mudar('email', e.target.value)} required />
-        <Campo etiqueta="Telefone" value={form.telefone} onChange={(e) => mudar('telefone', e.target.value)} inputMode="tel" />
+        <Campo
+          etiqueta="Telefone"
+          value={form.telefone}
+          onChange={(e) => mudar('telefone', formatarTelefone(e.target.value))}
+          inputMode="tel"
+          placeholder="(19) 99999-9999"
+          autoComplete="tel"
+          required
+        />
 
         <Campo etiqueta="Sexo" ajuda="Opcional. Usado apenas no filtro de segurança entre mulheres.">
           <select value={form.sexo} onChange={(e) => mudar('sexo', e.target.value)}>

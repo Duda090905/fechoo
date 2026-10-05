@@ -6,6 +6,8 @@
  */
 process.env.DB_DIALECT = 'sqlite';
 process.env.JWT_SECRET = 'chave-de-teste';
+// Fotos de teste vao para uma pasta temporaria, nunca para backend/uploads.
+process.env.UPLOADS_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'fecho-uploads-'));
 
 const { sequelize, Area, Categoria, Bairro } = require('../src/models');
 const app = require('../src/app');
@@ -33,17 +35,32 @@ async function chamar(caminho, { metodo = 'GET', corpo, token } = {}) {
   return { status: resposta.status, dados: await resposta.json().catch(() => ({})) };
 }
 
+// Envia o campo "foto" como formulario multipart (sem bytes = formulario vazio).
+async function enviarFoto(token, bytes, { nome = 'foto.png', tipo = 'image/png' } = {}) {
+  const form = new FormData();
+  if (bytes) form.append('foto', new Blob([bytes], { type: tipo }), nome);
+  const resposta = await fetch(`${base}/prestadores/foto`, {
+    method: 'PUT', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form
+  });
+  return { status: resposta.status, dados: await resposta.json().catch(() => ({})) };
+}
+
+// Abre um arquivo servido pela API (fora do prefixo /api).
+function buscarArquivo(caminho) {
+  return fetch(`${base.replace(/\/api$/, '')}${caminho}`);
+}
+
 const CONTRATANTE = {
   nome: 'Ana Souza', cpf: '52998224725', email: 'ana@teste.com',
-  senha: 'senha1234', tipo_perfil: 'contratante', sexo: 'feminino', aceite_termos: true
+  telefone: '19999990000', senha: 'senha1234', tipo_perfil: 'contratante', sexo: 'feminino', aceite_termos: true
 };
 const PRESTADORA = {
   nome: 'Rita Lima', cpf: '11144477735', email: 'rita@teste.com',
-  senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'feminino', aceite_termos: true
+  telefone: '19999990000', senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'feminino', aceite_termos: true
 };
 const PRESTADOR = {
   nome: 'Joao Alves', cpf: '15350946056', email: 'joao@teste.com',
-  senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'masculino', aceite_termos: true
+  telefone: '19999990000', senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'masculino', aceite_termos: true
 };
 
 async function rodar() {
@@ -79,6 +96,47 @@ async function rodar() {
     metodo: 'POST', corpo: { ...CONTRATANTE, email: 'fraca@teste.com', cpf: '15350946056', senha: '123' }
   });
   checar('recusa senha fraca', senhaFraca.status === 400);
+
+  const emailRuim = await chamar('/auth/register', {
+    metodo: 'POST', corpo: { ...CONTRATANTE, email: 'isso-nao-e-email', cpf: '71428793860' }
+  });
+  checar('recusa e-mail com formato invalido', emailRuim.status === 400);
+
+  const telefoneRuim = await chamar('/auth/register', {
+    metodo: 'POST', corpo: { ...CONTRATANTE, email: 'tel@teste.com', cpf: '71428793860', telefone: '123' }
+  });
+  checar('recusa telefone com quantidade de digitos invalida', telefoneRuim.status === 400);
+
+  const { telefone: _omitido, ...semTelefoneCorpo } = CONTRATANTE;
+  const semTelefone = await chamar('/auth/register', {
+    metodo: 'POST', corpo: { ...semTelefoneCorpo, email: 'semtel@teste.com', cpf: '71428793860' }
+  });
+  checar('recusa cadastro sem telefone', semTelefone.status === 400);
+
+  const telefoneVazio = await chamar('/auth/register', {
+    metodo: 'POST', corpo: { ...CONTRATANTE, email: 'telvazio@teste.com', cpf: '71428793860', telefone: '  ' }
+  });
+  checar('recusa cadastro com telefone em branco', telefoneVazio.status === 400);
+
+  const emailMaiusculo = await chamar('/auth/register', {
+    metodo: 'POST', corpo: { ...CONTRATANTE, email: 'ANA@TESTE.COM', cpf: '71428793860' }
+  });
+  checar('e-mail repetido com letras maiusculas tambem e recusado', emailMaiusculo.status === 409);
+
+  const DANI = {
+    nome: '  Dani Rocha  ', cpf: '453.178.287-91', email: '  Dani@Teste.COM ',
+    telefone: '(19) 99876-5432', senha: 'senha1234', tipo_perfil: 'contratante', aceite_termos: true
+  };
+  const cadDani = await chamar('/auth/register', { metodo: 'POST', corpo: DANI });
+  checar('cadastra com CPF mascarado, e-mail com espacos e maiusculas',
+    cadDani.status === 201 && cadDani.dados.usuario.email === 'dani@teste.com');
+  checar('nome e telefone sao guardados limpos',
+    cadDani.dados.usuario.nome === 'Dani Rocha' && cadDani.dados.usuario.telefone === '19998765432');
+
+  const loginDani = await chamar('/auth/login', {
+    metodo: 'POST', corpo: { email: 'DANI@teste.com', senha: 'senha1234' }
+  });
+  checar('login nao diferencia maiusculas e minusculas no e-mail', loginDani.status === 200);
 
   const semTermo = await chamar('/auth/register', {
     metodo: 'POST', corpo: { ...CONTRATANTE, email: 'termo@teste.com', cpf: '15350946056', aceite_termos: false }
@@ -142,7 +200,7 @@ async function rodar() {
 
   const CARLA = {
     nome: 'Carla Dias', cpf: '16899535009', email: 'carla@teste.com',
-    senha: 'senhaantiga1', tipo_perfil: 'contratante', aceite_termos: true
+    telefone: '19999990000', senha: 'senhaantiga1', tipo_perfil: 'contratante', aceite_termos: true
   };
   const cadCarla = await chamar('/auth/register', { metodo: 'POST', corpo: CARLA });
   const tokenCarlaAntigo = cadCarla.dados.token;
@@ -252,14 +310,74 @@ async function rodar() {
   checar('perfil recusado nao altera o que estava salvo',
     aindaIntacto.dados.prestador.categorias.length === 2 && aindaIntacto.dados.prestador.bairros.length === 1);
 
+  console.log('\nUS05 - Foto do perfil (upload)');
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+  const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32)]);
+
+  const semArquivo = await enviarFoto(tokenRita, null);
+  checar('recusa envio sem arquivo', semArquivo.status === 400);
+
+  const falsoPng = await enviarFoto(tokenRita, Buffer.from('isto e um texto, nao uma imagem'), { nome: 'foto.png' });
+  checar('recusa arquivo que finge ser imagem (confere o conteudo, nao o nome)', falsoPng.status === 400);
+
+  const svg = await enviarFoto(tokenRita, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
+    { nome: 'foto.svg', tipo: 'image/svg+xml' });
+  checar('recusa SVG (pode carregar script)', svg.status === 400);
+
+  const grande = await enviarFoto(tokenRita, Buffer.concat([PNG, Buffer.alloc(2 * 1024 * 1024)]));
+  checar('recusa foto maior que 2 MB', grande.status === 413);
+
+  const contratanteEnviando = await enviarFoto(tokenAna, PNG);
+  checar('contratante nao envia foto de prestador', contratanteEnviando.status === 403);
+
+  const semLogin = await enviarFoto(null, PNG);
+  checar('envio exige login', semLogin.status === 401);
+
+  const fotoPng = await enviarFoto(tokenRita, PNG);
+  checar('aceita PNG e devolve o endereco da foto',
+    fotoPng.status === 200 && /^\/uploads\/perfis\/[0-9a-f]{32}\.png$/.test(fotoPng.dados.foto_url || ''));
+
+  const arquivoPng = await buscarArquivo(fotoPng.dados.foto_url);
+  checar('a foto enviada pode ser aberta, como imagem',
+    arquivoPng.status === 200 && arquivoPng.headers.get('content-type') === 'image/png');
+  checar('a foto e servida com nosniff', arquivoPng.headers.get('x-content-type-options') === 'nosniff');
+
+  const comFoto = await chamar('/prestadores/meu-perfil', { token: tokenRita });
+  checar('o perfil passa a mostrar a foto', comFoto.dados.prestador.foto_url === fotoPng.dados.foto_url);
+
+  const mantem = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: tokenRita, corpo: { descricao: 'Outra descricao.' }
+  });
+  checar('salvar o perfil sem enviar foto nao apaga a foto', mantem.dados.prestador.foto_url === fotoPng.dados.foto_url);
+
+  const ignoraLink = await chamar('/prestadores/meu-perfil', {
+    metodo: 'PUT', token: tokenRita, corpo: { foto_url: 'https://exemplo.com/outra.jpg' }
+  });
+  checar('endereco externo de foto nao e mais aceito', ignoraLink.dados.prestador.foto_url === fotoPng.dados.foto_url);
+
+  const fotoJpg = await enviarFoto(tokenRita, JPG, { nome: 'rita.jpg', tipo: 'image/jpeg' });
+  checar('trocar por JPEG funciona', fotoJpg.status === 200 && fotoJpg.dados.foto_url.endsWith('.jpg'));
+
+  const antigaSumiu = await buscarArquivo(fotoPng.dados.foto_url);
+  checar('a foto antiga e apagada do disco ao trocar', antigaSumiu.status === 404);
+
+  const remocao = await chamar('/prestadores/foto', { metodo: 'DELETE', token: tokenRita });
+  checar('remover a foto limpa o perfil', remocao.status === 200);
+  const semMais = await chamar('/prestadores/meu-perfil', { token: tokenRita });
+  checar('perfil sem foto devolve nulo', semMais.dados.prestador.foto_url === null);
+  checar('remover a foto apaga o arquivo do disco', (await buscarArquivo(fotoJpg.dados.foto_url)).status === 404);
+
+  const removeDeNovo = await chamar('/prestadores/foto', { metodo: 'DELETE', token: tokenRita });
+  checar('remover quando nao ha foto nao da erro', removeDeNovo.status === 200);
+
   // Prestadores incompletos: nao podem aparecer em nenhuma busca.
   const SEM_CATEGORIA = {
     nome: 'Paulo Sem Categoria', cpf: '39053344705', email: 'paulo@teste.com',
-    senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'masculino', aceite_termos: true
+    telefone: '19999990000', senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'masculino', aceite_termos: true
   };
   const SEM_BAIRRO = {
     nome: 'Bia Sem Bairro', cpf: '86288366757', email: 'bia@teste.com',
-    senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'feminino', aceite_termos: true
+    telefone: '19999990000', senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'feminino', aceite_termos: true
   };
   const cadSemCategoria = await chamar('/auth/register', { metodo: 'POST', corpo: SEM_CATEGORIA });
   const cadSemBairro = await chamar('/auth/register', { metodo: 'POST', corpo: SEM_BAIRRO });
@@ -377,6 +495,13 @@ async function rodar() {
   const depoisDeVoltar = await chamar('/conta', { metodo: 'PUT', token: tokenInativa, corpo: { nome: CONTRATANTE.nome } });
   checar('apos reativar, volta a usar a plataforma', depoisDeVoltar.status === 200);
 
+  const apagarTelefone = await chamar('/conta', { metodo: 'PUT', token: tokenInativa, corpo: { telefone: '' } });
+  checar('nao deixa apagar o telefone ao editar a conta', apagarTelefone.status === 400);
+
+  const trocarTelefone = await chamar('/conta', { metodo: 'PUT', token: tokenInativa, corpo: { telefone: '(19) 3333-4444' } });
+  checar('troca o telefone e guarda so os digitos',
+    trocarTelefone.status === 200 && trocarTelefone.dados.usuario.telefone === '1933334444');
+
   const apagarAtiva = await chamar('/conta/definitiva', {
     metodo: 'DELETE', token: tokenInativa, corpo: { confirmacao: 'APAGAR MEUS DADOS' }
   });
@@ -435,6 +560,24 @@ async function rodar() {
     metodo: 'POST', corpo: { ...CONTRATANTE, nome: 'Terceira tentativa', email: 'terceira@teste.com' }
   });
   checar('CPF banido nao cria conta nova nem depois de apagar', tentativaBanida.status === 403);
+
+  console.log('\nUS04 - Apagar os dados tambem apaga a foto do disco');
+  const LIA = {
+    nome: 'Lia Prado', cpf: '93541134780', email: 'lia@teste.com', telefone: '19999990000',
+    senha: 'senha1234', tipo_perfil: 'prestador', sexo: 'feminino', aceite_termos: true
+  };
+  const cadLia = await chamar('/auth/register', { metodo: 'POST', corpo: LIA });
+  const fotoLia = await enviarFoto(cadLia.dados.token, PNG);
+  checar('prestadora envia a foto antes de sair', fotoLia.status === 200 && (await buscarArquivo(fotoLia.dados.foto_url)).status === 200);
+
+  await chamar('/conta', { metodo: 'DELETE', token: cadLia.dados.token, corpo: { confirmacao: 'DESATIVAR' } });
+  checar('desativar a conta mantem a foto (os dados ficam guardados)', (await buscarArquivo(fotoLia.dados.foto_url)).status === 200);
+
+  const apagouLia = await chamar('/conta/definitiva', {
+    metodo: 'DELETE', token: cadLia.dados.token, corpo: { confirmacao: 'APAGAR MEUS DADOS' }
+  });
+  checar('apagar os dados remove o arquivo da foto (LGPD)',
+    apagouLia.status === 200 && (await buscarArquivo(fotoLia.dados.foto_url)).status === 404);
 
   servidor.close();
   await sequelize.close();

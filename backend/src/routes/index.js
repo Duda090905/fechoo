@@ -4,6 +4,7 @@ const conta = require('../controllers/contaController');
 const prestador = require('../controllers/prestadorController');
 const catalogo = require('../controllers/catalogoController');
 const { autenticar, apenasPerfil, exigirAtivo } = require('../middlewares/auth');
+const { receberFoto } = require('../middlewares/upload');
 
 const rotas = Router();
 
@@ -32,6 +33,8 @@ rotas.delete('/conta/definitiva', autenticar, conta.excluirDefinitivo);
 
 rotas.get('/prestadores/meu-perfil', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.meuPerfil);
 rotas.put('/prestadores/meu-perfil', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.salvarPerfil);
+rotas.put('/prestadores/foto', autenticar, exigirAtivo, apenasPerfil('prestador'), receberFoto, prestador.enviarFoto);
+rotas.delete('/prestadores/foto', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.removerFoto);
 rotas.patch('/prestadores/pausa', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.alternarPausa);
 
 module.exports = rotas;

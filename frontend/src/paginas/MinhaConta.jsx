@@ -5,6 +5,7 @@ import { useAuth } from '../contexto/AuthContexto';
 import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
+import { formatarTelefone, telefoneValido } from '../utils/formatos';
 import './painel.css';
 
 export default function MinhaConta() {
@@ -25,7 +26,7 @@ export default function MinhaConta() {
     if (usuario) {
       setForm({
         nome: usuario.nome || '',
-        telefone: usuario.telefone || '',
+        telefone: formatarTelefone(usuario.telefone),
         sexo: usuario.sexo || 'nao_informado'
       });
     }
@@ -37,7 +38,12 @@ export default function MinhaConta() {
 
   async function salvar(evento) {
     evento.preventDefault();
-    setErro(''); setMensagem(''); setSalvando(true);
+    setErro(''); setMensagem('');
+    if (!telefoneValido(form.telefone)) {
+      setErro('Informe o telefone com DDD, por exemplo (19) 99999-9999.');
+      return;
+    }
+    setSalvando(true);
     try {
       const dados = await api.atualizarConta(form);
       atualizarUsuario(dados.usuario);
@@ -130,7 +136,7 @@ export default function MinhaConta() {
             </div>
             <div className="dado">
               <span className="dado__rotulo">Telefone</span>
-              <span className="dado__valor">{usuario?.telefone || 'não informado'}</span>
+              <span className="dado__valor">{formatarTelefone(usuario?.telefone) || 'não informado'}</span>
             </div>
             <div className="dado">
               <span className="dado__rotulo">Tipo de perfil</span>
@@ -142,7 +148,7 @@ export default function MinhaConta() {
         ) : (
           <form onSubmit={salvar}>
             <Campo etiqueta="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
-            <Campo etiqueta="Telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} inputMode="tel" />
+            <Campo etiqueta="Telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: formatarTelefone(e.target.value) })} inputMode="tel" placeholder="(19) 99999-9999" required />
             <Campo etiqueta="Sexo" ajuda="Opcional. Usado apenas no filtro de segurança entre mulheres.">
               <select value={form.sexo} onChange={(e) => setForm({ ...form, sexo: e.target.value })}>
                 <option value="nao_informado">Prefiro não informar</option>

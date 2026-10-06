@@ -1,10 +1,11 @@
 const { Op } = require('sequelize');
 const { Usuario, TokenSenha } = require('../models');
-const { cpfValido, limpar } = require('../utils/cpf');
+const { cpfValido, limpar, impressaoCpf } = require('../utils/cpf');
 const { senhaForte, gerarHash, conferir, REGRA } = require('../utils/senha');
 const { gerarJWT, gerarTokenRecuperacao, hashDeToken } = require('../utils/token');
 const { enviarLinkRecuperacao } = require('../utils/email');
 const { normalizarEmail, emailValido, normalizarTelefone } = require('../utils/contato');
+const { reabrirConta } = require('../servicos/reabertura');
 
 const MINUTOS_TOKEN = 30;
 
@@ -42,8 +43,15 @@ async function cadastrar(req, res, next) {
       return res.status(400).json({ erro: 'E preciso aceitar os termos para criar a conta.' });
     }
 
+    const cpfLimpo = limpar(cpf);
+    const impressao = impressaoCpf(cpfLimpo);
+
+    // Conta ativa ou inativa com esse e-mail ou CPF: nao cria outra.
     const jaExiste = await Usuario.findOne({
-      where: { [Op.or]: [{ email }, { cpf: limpar(cpf) }] }
+      where: {
+        status: { [Op.ne]: 'excluido' },
+        [Op.or]: [{ email }, { cpf: cpfLimpo }, { cpf_hash: impressao }]
+      }
     });
     if (jaExiste) {
       // Mensagem unica de proposito: nao revela se a conta esta ativa ou
@@ -54,21 +62,34 @@ async function cadastrar(req, res, next) {
       });
     }
 
-    const usuario = await Usuario.create({
+    // US04 - a pessoa apagou os dados antes. O CPF nao esta mais no banco,
+    // mas a impressao dele sim: um CPF, uma conta.
+    const anterior = await Usuario.findOne({ where: { cpf_hash: impressao, status: 'excluido' } });
+    if (anterior && anterior.bloqueado_novo_cadastro) {
+      return res.status(403).json({ erro: 'Não é possível criar conta com esse CPF. Fale com o suporte.' });
+    }
+
+    const dados = {
       nome,
-      cpf: limpar(cpf),
+      cpf: cpfLimpo,
       email,
       telefone,
       senha_hash: await gerarHash(senha),
       tipo_perfil,
-      sexo: sexo || 'nao_informado',
-      aceite_termos: true,
-      aceite_termos_em: new Date()
-    });
+      sexo: sexo || 'nao_informado'
+    };
+
+    const usuario = anterior
+      ? await reabrirConta(anterior, dados)
+      : await Usuario.create({ ...dados, cpf_hash: impressao, aceite_termos: true, aceite_termos_em: new Date() });
 
     return res.status(201).json({
       usuario: usuario.publico(),
-      token: gerarJWT(usuario)
+      token: gerarJWT(usuario),
+      historico_recuperado: Boolean(anterior),
+      aviso: anterior
+        ? 'Você já teve uma conta com esse CPF e ela foi reaberta. Seus dados são os que você acabou de preencher, e o histórico da conta continua o mesmo.'
+        : undefined
     });
   } catch (e) {
     return next(e);

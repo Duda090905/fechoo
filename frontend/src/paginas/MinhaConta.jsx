@@ -148,8 +148,10 @@ export default function MinhaConta() {
         <div className="cartao cartao--perigo">
           <h2>Apagar meus dados</h2>
           <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
-            Apaga nome, e-mail, CPF e telefone em definitivo, conforme a LGPD. A conta não volta
-            e você não recupera suas avaliações.
+            Apaga seu nome, e-mail, CPF, telefone, senha e foto, conforme a LGPD. Guardamos só um código
+            gerado do seu CPF, que não permite descobrir o número, e o histórico da conta, sem o seu nome.
+            Se um dia você se cadastrar de novo com o mesmo CPF, volta para esta mesma conta: preenche os
+            dados de novo, e o histórico continua o mesmo.
           </p>
 
           {etapa !== 'apagar' ? (

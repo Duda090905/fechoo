@@ -11,8 +11,6 @@ CREATE TABLE usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(120) NOT NULL,
   cpf VARCHAR(11) UNIQUE,
-  -- impressao do CPF (HMAC com CPF_PEPPER); fica depois de apagar os dados: um CPF, uma conta
-  cpf_hash VARCHAR(64) UNIQUE,
   email VARCHAR(160) UNIQUE,
   telefone VARCHAR(20),
   senha_hash VARCHAR(120),
@@ -24,8 +22,6 @@ CREATE TABLE usuarios (
   aceite_termos_em DATETIME,
   -- sobe a cada troca de senha e encerra as sessoes anteriores
   token_versao INT NOT NULL DEFAULT 0,
-  -- banimento: esse CPF nao reabre a conta (tela na US25)
-  bloqueado_novo_cadastro BOOLEAN NOT NULL DEFAULT FALSE,
   -- retencao de conta inativa: o relogio dos 12 meses conta do mais recente entre
   -- desativado_em e ultimo_acesso_em; aviso_retencao_em marca o envio do e-mail de aviso
   ultimo_acesso_em DATETIME,

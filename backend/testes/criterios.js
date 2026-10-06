@@ -507,10 +507,6 @@ async function rodar() {
   checar('so apaga os dados depois de desativar', apagarAtiva.status === 409);
 
   await chamar('/conta', { metodo: 'DELETE', token: tokenInativa, corpo: { confirmacao: 'DESATIVAR' } });
-  // Link de troca de senha pedido antes de apagar: nao pode servir depois.
-  await TokenSenha.create({
-    usuario_id: salvo.id, token_hash: hashDeToken('link-de-antes-de-apagar'), expira_em: new Date(Date.now() + 30 * 60000)
-  });
   const apagou = await chamar('/conta/definitiva', {
     metodo: 'DELETE', token: tokenInativa, corpo: { confirmacao: 'APAGAR MEUS DADOS' }
   });
@@ -531,63 +527,12 @@ async function rodar() {
   const tokenAntigo = await chamar('/conta', { token: tokenInativa });
   checar('token antigo deixa de funcionar apos apagar os dados', tokenAntigo.status === 401);
 
-  console.log('\nUS04 - Um CPF, uma conta: quem apaga os dados e volta reabre a mesma conta');
-  checar('o cadastro ja grava a impressao do CPF (64 caracteres), nao o numero',
-    typeof salvo.cpf_hash === 'string' && salvo.cpf_hash.length === 64 && !salvo.cpf_hash.includes(CONTRATANTE.cpf));
-  checar('apagar os dados tira o CPF, mas guarda a impressao',
-    anonimizado.cpf === null && typeof anonimizado.cpf_hash === 'string' && anonimizado.cpf_hash === salvo.cpf_hash);
-
-  const voltou = await chamar('/auth/register', {
+  console.log('\nUS04 - Depois de apagar os dados');
+  const mesmoCpfDepois = await chamar('/auth/register', {
     metodo: 'POST', corpo: { ...CONTRATANTE, nome: 'Ana Souza Nova', email: 'ana.nova@teste.com' }
   });
-  checar('cadastro com o mesmo CPF e aceito e avisa que a conta foi reaberta',
-    voltou.status === 201 && voltou.dados.historico_recuperado === true && Boolean(voltou.dados.aviso));
-  checar('volta para a MESMA conta (mesmo id), e nao para uma conta nova',
-    voltou.dados.usuario.id === salvo.id && await Usuario.count({ where: { cpf_hash: salvo.cpf_hash } }) === 1);
-
-  const reaberta = await Usuario.findByPk(salvo.id);
-  checar('a conta reaberta fica ativa, com os dados novos e o CPF de volta',
-    reaberta.status === 'ativo' && reaberta.nome === 'Ana Souza Nova' && reaberta.email === 'ana.nova@teste.com'
-    && reaberta.cpf === CONTRATANTE.cpf && reaberta.excluido_em === null);
-  checar('os dados pessoais antigos nao voltam (foram apagados a pedido)',
-    reaberta.nome !== CONTRATANTE.nome && reaberta.email !== CONTRATANTE.email);
-  checar('o historico continua ligado a mesma conta (pedidos de saida anteriores)',
-    await SolicitacaoExclusao.count({ where: { usuario_id: salvo.id } }) === 4);
-
-  const tokenDeAntes = await chamar('/conta', { token: tokenInativa });
-  checar('token de antes da exclusao nao volta a valer com a conta reaberta', tokenDeAntes.status === 401);
-  const linkDeAntes = await chamar('/auth/redefinir-senha', {
-    metodo: 'POST', corpo: { token: 'link-de-antes-de-apagar', senha: 'outrasenha1' }
-  });
-  checar('link de troca de senha de antes da exclusao nao funciona depois', linkDeAntes.status === 400);
-  const entraDeNovo = await chamar('/auth/login', {
-    metodo: 'POST', corpo: { email: 'ana.nova@teste.com', senha: CONTRATANTE.senha }
-  });
-  checar('entra na conta reaberta com o e-mail e a senha novos', entraDeNovo.status === 200 && entraDeNovo.dados.usuario.id === salvo.id);
-
-  const repetidoDepois = await chamar('/auth/register', {
-    metodo: 'POST', corpo: { ...CONTRATANTE, email: 'ana.terceira@teste.com' }
-  });
-  checar('com a conta reaberta, o mesmo CPF volta a ser recusado', repetidoDepois.status === 409);
-
-  const outroCpf = await chamar('/auth/register', {
-    metodo: 'POST', corpo: { ...CONTRATANTE, cpf: '71428793860', email: 'semhistorico@teste.com' }
-  });
-  checar('CPF diferente cria conta nova, sem historico', outroCpf.status === 201 && outroCpf.dados.historico_recuperado === false
-    && outroCpf.dados.usuario.id !== salvo.id);
-
-  // Banimento: a tela e a US25; a regra ja vale aqui.
-  const BANIDO = {
-    nome: 'Beto Banido', cpf: '25834617026', email: 'beto@teste.com', telefone: '19999990000',
-    senha: 'senha1234', tipo_perfil: 'contratante', aceite_termos: true
-  };
-  const cadBanido = await chamar('/auth/register', { metodo: 'POST', corpo: BANIDO });
-  await chamar('/conta', { metodo: 'DELETE', token: cadBanido.dados.token, corpo: { confirmacao: 'DESATIVAR' } });
-  await chamar('/conta/definitiva', { metodo: 'DELETE', token: cadBanido.dados.token, corpo: { confirmacao: 'APAGAR MEUS DADOS' } });
-  await Usuario.update({ bloqueado_novo_cadastro: true }, { where: { id: cadBanido.dados.usuario.id } });
-  const voltaBanido = await chamar('/auth/register', { metodo: 'POST', corpo: { ...BANIDO, email: 'beto2@teste.com' } });
-  checar('CPF banido nao reabre a conta nem cria outra', voltaBanido.status === 403
-    && await Usuario.count({ where: { email: 'beto2@teste.com' } }) === 0);
+  checar('apos apagar os dados o CPF fica livre, e o novo cadastro nao herda nada da conta antiga',
+    mesmoCpfDepois.status === 201 && mesmoCpfDepois.dados.usuario.nome === 'Ana Souza Nova');
 
   console.log('\nUS04 - Retencao de conta inativa (12 meses, aviso 30 dias antes)');
   const { processarRetencao, somarMeses } = require('../src/servicos/retencao');
@@ -701,18 +646,6 @@ async function rodar() {
   });
   checar('apagar os dados remove o arquivo da foto (LGPD)',
     apagouLia.status === 200 && (await buscarArquivo(fotoLia.dados.foto_url)).status === 404);
-
-  const liaVolta = await chamar('/auth/register', { metodo: 'POST', corpo: { ...LIA, email: 'lia.nova@teste.com' } });
-  checar('prestadora que apagou os dados reabre a mesma conta, com o perfil vazio',
-    liaVolta.status === 201 && liaVolta.dados.usuario.id === cadLia.dados.usuario.id
-    && (await chamar('/prestadores/meu-perfil', { token: liaVolta.dados.token })).dados.prestador.categorias.length === 0);
-  await chamar('/prestadores/meu-perfil', {
-    metodo: 'PUT', token: liaVolta.dados.token, corpo: { categorias: [idsCategorias[0]], bairros: [bairro.id] }
-  });
-  const listaComLia = await chamar('/prestadores');
-  const pausaLia = await chamar('/prestadores/pausa', { metodo: 'PATCH', token: liaVolta.dados.token });
-  checar('o perfil reaberto volta a aparecer e pode ser pausado (nao fica preso como suspenso)',
-    listaComLia.dados.prestadores.some((p) => p.nome === LIA.nome) && pausaLia.status === 200);
 
   servidor.close();
   await sequelize.close();

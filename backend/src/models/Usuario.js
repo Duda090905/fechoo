@@ -7,9 +7,6 @@ class Usuario extends Model {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       nome: { type: DataTypes.STRING(120), allowNull: false },
       cpf: { type: DataTypes.STRING(11), allowNull: true, unique: true },
-      // US04 - impressao do CPF (HMAC com CPF_PEPPER), gravada no cadastro.
-      // Continua aqui depois que a pessoa apaga os dados: um CPF, uma conta.
-      cpf_hash: { type: DataTypes.STRING(64), allowNull: true, unique: true },
       email: { type: DataTypes.STRING(160), allowNull: true, unique: true },
       telefone: { type: DataTypes.STRING(20), allowNull: true },
       senha_hash: { type: DataTypes.STRING(120), allowNull: true },
@@ -32,9 +29,6 @@ class Usuario extends Model {
       // marca quando o e-mail de aviso foi enviado (volta a nulo se a pessoa entrar).
       ultimo_acesso_em: { type: DataTypes.DATE, allowNull: true },
       aviso_retencao_em: { type: DataTypes.DATE, allowNull: true },
-      // US04 - banimento: este CPF nao reabre a conta nem depois de apagar os
-      // dados. Quem marca e a administracao (tela na US25).
-      bloqueado_novo_cadastro: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       desativado_em: { type: DataTypes.DATE, allowNull: true },
       reativado_em: { type: DataTypes.DATE, allowNull: true },
       excluido_em: { type: DataTypes.DATE, allowNull: true }

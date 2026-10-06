@@ -46,7 +46,6 @@ Pontos que o cliente deve levar da reunião:
 - [ ] **Frontend:** `cd frontend` e `npm run dev` → abrir `http://localhost:5173`.
   Atenção: rodar **só** `npm run dev`, sem comentário depois do comando.
 - [ ] **Categorias e bairros carregados:** `cd backend` e `npm run db:seed`. A home deve listar as categorias.
-- [ ] **`CPF_PEPPER` definida** no `backend/.env` (uma vez só; nunca trocar depois que houver contas).
 - [ ] **Banco novo de colunas:** se o banco foi criado antes das últimas mudanças, aplicar os `ALTER TABLE` do `ALTERACOES.md`
   (ou recriar o banco e rodar o seed).
 
@@ -71,7 +70,7 @@ Pontos que o cliente deve levar da reunião:
   Se o grupo configurar um SMTP de teste (por exemplo Mailtrap) no `.env`, o e-mail chega de verdade.
 - [ ] **Segundo navegador ou janela anônima**, para mostrar dois usuários ao mesmo tempo.
 - [ ] (Opcional) **MySQL Workbench** conectado em `127.0.0.1`, usuário `root`, banco `fecho`, para mostrar os dados gravados.
-- [ ] **Rodar `npm run teste` uma vez antes**, em `backend`. Deve terminar com *"121 criterios passaram, 0 falharam."*.
+- [ ] **Rodar `npm run teste` uma vez antes**, em `backend`. Deve terminar com *"107 criterios passaram, 0 falharam."*.
 
 ### 2.3 Começar do zero (recomendado)
 
@@ -88,7 +87,7 @@ DELETE FROM tokens_senha WHERE usuario_id IN (SELECT id FROM usuarios WHERE emai
 DELETE FROM usuarios WHERE email LIKE '%@demo.com';
 ```
 
-Contas que já passaram pelo "Apagar meus dados" perdem o e-mail e não entram nessa limpeza. Elas guardam a impressão do CPF: para reaproveitar um CPF de teste, cadastre de novo com ele e a mesma conta é reaberta.
+Contas que já passaram pelo "Apagar meus dados" perdem o e-mail e não entram nessa limpeza; o CPF delas fica livre mesmo assim.
 As fotos enviadas ficam em `backend/uploads/perfis`; podem ficar lá.
 
 ---
@@ -232,11 +231,9 @@ volta ao login com o aviso *"Sua sessão terminou"*.
 3. Clicar em desativar, digitar `DESATIVAR` → conta desativada. Mostrar que ela perde o acesso ao resto do sistema.
 4. **Reativar** → tudo volta como estava.
 5. Desativar de novo e usar **Apagar meus dados**, digitando `APAGAR MEUS DADOS`.
-6. No Workbench: `SELECT id, nome, email, cpf, cpf_hash, status FROM usuarios;` → a conta aparece como **"Usuario removido"**, sem e-mail e sem CPF, status `excluido`, mas com o `cpf_hash` (64 caracteres que não revelam o número).
+6. No Workbench: `SELECT id, nome, email, cpf, status FROM usuarios;` → a conta aparece como **"Usuario removido"**, sem e-mail e sem CPF, status `excluido`.
 7. `SELECT * FROM solicitacoes_exclusao;` → cada pedido tem **data, origem e resultado**.
 8. Mostrar que o **token antigo** da conta apagada não funciona mais.
-9. Em **Criar conta**, cadastrar de novo com o **mesmo CPF** (outro e-mail) → aviso *"Você já teve uma conta com esse CPF e ela foi reaberta"*.
-10. No Workbench, repetir o `SELECT`: o **`id` é o mesmo** da conta apagada. Não nasceu uma conta nova.
 
 **Critérios de aceite**
 - [x] Após a exclusão, o nome do usuário não aparece mais em buscas nem em perfis.
@@ -245,9 +242,6 @@ volta ao login com o aviso *"Sua sessão terminou"*.
 - [~] "Usuário com serviço em andamento recebe recusa explicando o motivo": o **mecanismo** está pronto e provado nos testes automáticos
   com um serviço simulado; o serviço real nasce no Sprint 2.
 - [~] "As avaliações antigas permanecem, mas sem identificar a pessoa": a anonimização está pronta; as avaliações existem a partir da US24.
-- [x] Regra do grupo, um CPF, uma conta: quem apaga os dados e volta com o mesmo CPF reabre a mesma conta, com o mesmo histórico.
-
-**Dizer:** "Apagar os dados cumpre a LGPD, mas não serve para fugir do histórico: guardamos só uma impressão do CPF, que não revela o número, e quem volta com ele reabre a mesma conta."
 
 **Retenção de conta inativa (pedido do cliente)**
 - Quem desativa a conta tem os dados guardados por **12 meses**; depois, os dados pessoais são **anonimizados**.
@@ -263,7 +257,7 @@ No terminal, em `backend`:
 npm run teste
 ```
 
-Mostrar a lista passando e a linha final: **"121 criterios passaram, 0 falharam."**
+Mostrar a lista passando e a linha final: **"107 criterios passaram, 0 falharam."**
 O teste sobe a API num banco temporário em memória, não mexe nos dados da demonstração e não precisa de MySQL.
 
 | Card | Verificações automáticas |
@@ -274,8 +268,8 @@ O teste sobe a API num banco temporário em memória, não mexe nos dados da dem
 | US05 Perfil do prestador (perfil, validação, foto) | 31 |
 | US07 Pausar perfil | 7 |
 | US08 Filtro entre mulheres | 3 |
-| US04 Exclusão de conta e dados (inclui retenção e "um CPF, uma conta") | 48 |
-| **Total** | **121** |
+| US04 Exclusão de conta e dados (inclui retenção) | 34 |
+| **Total** | **107** |
 
 ---
 
@@ -299,7 +293,6 @@ Legenda: **[x]** demonstrável e testado agora · **[~]** mecanismo pronto, prov
 | US04 | Serviço em andamento: recusa com motivo | [~] | testes automáticos; real no Sprint 2 |
 | US04 | Nome não aparece mais em buscas e perfis | [x] | 3.8 |
 | US04 | Avaliações antigas sem identificar a pessoa | [~] | depende da US24 |
-| US04 | Um CPF, uma conta: quem apaga e volta reabre a mesma conta (regra do grupo) | [x] | 3.8 |
 | US05 | Impede a sexta categoria | [x] | 3.5 |
 | US05 | Sem categoria ou bairro não aparece na busca | [x] | 3.5 |
 | US05 | Alteração reflete na busca | [x] | 3.5 |
@@ -349,7 +342,6 @@ Para o cliente não esperar o que não foi pedido:
 | Lista oficial de bairros | 25 bairros de exemplo, já combinado | Cliente |
 | Retenção de conta inativa: 12 meses e anonimizar | Implementado como proposta | Confirmar com o cliente |
 | Texto dos termos de uso e da política de privacidade | Hoje o aceite é uma frase | Grupo e cliente |
-| Impressão do CPF guardada depois de apagar os dados | Finalidade (prevenção a fraude) avisada no cadastro e em Minha conta; falta constar nos termos | Grupo |
 | Envio real de e-mail | Sem SMTP configurado, o link aparece no console | Grupo, se quiser mostrar o e-mail |
 | Fotos guardadas em disco | Servem para desenvolvimento e apresentação; em produção, armazenamento externo | Sprint de publicação |
 | A rotina de retenção só roda com a API no ar | Em produção, usar um agendador externo | Sprint de publicação |
@@ -363,13 +355,7 @@ Para o cliente não esperar o que não foi pedido:
 Porque desativar é reversível: a pessoa volta quando quiser. O que apaga de vez é o botão "Apagar meus dados", ou a retenção de 12 meses.
 
 **"Se a pessoa apaga os dados, o que sobra?"**
-O registro da conta, sem nome, e-mail, CPF, telefone, senha e foto, e a impressão do CPF (um código HMAC que não revela o número). É o que permite manter o que a lei exige guardar (por exemplo, registros financeiros no futuro) sem identificar ninguém.
-
-**"E se alguém apagar a conta para fugir de uma avaliação ruim?"**
-Não adianta. Se a pessoa se cadastrar de novo com o mesmo CPF, o sistema reconhece a impressão e reabre a mesma conta, com o mesmo histórico. Ela só refaz os dados pessoais. Quem foi banido nem consegue reabrir.
-
-**"Guardar a impressão do CPF não fere a LGPD?"**
-Ela continua sendo dado pessoal (pseudonimizado), por isso guardamos só o mínimo, com uma finalidade definida: prevenção a fraude. O cadastro e a tela "Apagar meus dados" avisam isso, e precisa entrar nos termos de uso. Não somos advogados: em produção, isso passaria pelo jurídico.
+O registro da conta, sem nome, e-mail, CPF, telefone, senha e foto. É o que permite manter o que a lei exige guardar (por exemplo, registros financeiros no futuro) sem identificar ninguém.
 
 **"Dá para alguém descobrir se um e-mail ou CPF tem conta?"**
 Não pelas telas de login e de recuperação de senha, que respondem sempre igual. No cadastro, a mensagem de duplicidade é a mesma, esteja a conta ativa ou inativa.
@@ -411,14 +397,14 @@ O card de cadastro lista nome, CPF, e-mail, telefone e senha. Pode ser tornado o
 | "Já existe uma conta com esse e-mail ou CPF" | Usar outro e-mail ou outro CPF da lista |
 | O link de recuperação não aparece | Olhar o terminal do **backend** (não o do frontend); ele aparece logo após pedir o link |
 | A foto não aparece na prévia | Confirmar que o arquivo é JPG, PNG ou WebP e tem menos de 2 MB |
-| Qualquer erro inesperado | Rodar `npm run teste` e mostrar os 121 critérios passando: a prova não depende da tela |
+| Qualquer erro inesperado | Rodar `npm run teste` e mostrar os 107 critérios passando: a prova não depende da tela |
 
 ---
 
 ## 11. Checklist final (5 minutos antes)
 
 - [ ] MySQL, backend e frontend rodando
-- [ ] `npm run teste` passou (121 critérios)
+- [ ] `npm run teste` passou (107 critérios)
 - [ ] Home abre e mostra as categorias`n- [ ] Testado no navegador: a sessão encerrada volta ao login (ver 3.3) e a tela no celular
 - [ ] Terminal do backend visível
 - [ ] Foto de perfil pronta

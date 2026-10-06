@@ -14,7 +14,6 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | 4. Prioridade média (revisada) | 7, 8, 11, `schema.sql` e home enxuta | Concluída |
 | Retenção de conta inativa (US04) | 12 meses, aviso 30 dias antes | Concluída |
 | 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
-| Um CPF, uma conta (US04) | Volta a impressão do CPF; quem apaga e volta reabre a mesma conta | Concluída |
 
 ---
 
@@ -310,8 +309,8 @@ e o que não pertence a nenhum deles foi removido. Parte vinha do código origin
 | O que saiu | Pertence a | Onde estava |
 |---|---|---|
 | Corrente de contas (`conta_anterior_id`, `servicos/historico.js`, aviso "histórico recuperado") | Reputação, Sprint 3 | `Usuario`, cadastro, `CriarConta.jsx` |
-| Impressão digital do CPF (`cpf_hash`, `impressaoCpf`, `CPF_PEPPER`) — **voltou**, ver *Um CPF, uma conta* | Não está no US04 | `Usuario`, `utils/cpf.js`, exclusão definitiva, `.env.example` |
-| Banimento (`bloqueado_novo_cadastro`) — **a regra voltou**, ver *Um CPF, uma conta* (a tela continua na US25) | US25 (painel do administrador) | `Usuario`, cadastro |
+| Impressão digital do CPF (`cpf_hash`, `impressaoCpf`, `CPF_PEPPER`) | Não está no US04 | `Usuario`, `utils/cpf.js`, exclusão definitiva, `.env.example` |
+| Banimento (`bloqueado_novo_cadastro`) | US25 (painel do administrador) | `Usuario`, cadastro |
 | Bloqueio após 5 tentativas de login (`tentativas_login`, `bloqueado_ate`) | Não está no US02 | `Usuario`, login, redefinição de senha |
 | Selo "Verificado" (`Prestador.verificado`) | US06 | `Prestador`, perfil da API, `Prestadores.jsx` |
 | Perfil `administrador` e status `suspenso` do **usuário** | US25 | enums de `Usuario`, login |
@@ -507,88 +506,3 @@ O build do frontend compila sem erros.
 - A rotina só roda enquanto a API está no ar. Em hospedagem real, vale um agendador externo (cron) chamando a mesma função.
 - Não há registro de acesso (log) além do último login; o art. 15 do Marco Civil (6 meses de registros de acesso) não pesa hoje, mas deve ser revisto se a plataforma passar a guardar logs.
 - O prazo e o comportamento (anonimizar, e não apagar tudo) continuam sendo uma recomendação até o cliente confirmar.
-
----
-
-## Um CPF, uma conta (US04)
-
-### Por que voltou
-
-O enxugamento tinha tirado a impressão do CPF, e com isso "Apagar meus dados" liberava o CPF: a pessoa apagava a conta e
-criava outra, limpa, com o mesmo CPF. Isso conflita com a decisão do grupo para a US04 (guardar a impressão do CPF; quem foi
-banido não volta) e abre uma brecha de segurança: apagar a conta para fugir de avaliação ruim, de cancelamentos ou de disputa.
-
-### Regra
-
-- **Um CPF, uma conta.** O cadastro grava a impressão do CPF (`cpf_hash`). Ela continua no banco depois de apagar os dados.
-- Quem apaga os dados e se cadastra de novo com o mesmo CPF **reabre a mesma conta** (mesmo `id`), e não uma conta nova.
-  Preenche os dados pessoais de novo (foram apagados a pedido dela); o histórico ligado ao `id` continua o mesmo.
-- O perfil de prestador recomeça vazio (descrição, foto, categorias e bairros foram apagados), mas volta a poder ser montado e pausado.
-- Token de sessão e link de troca de senha emitidos antes da exclusão **não** voltam a valer na conta reaberta.
-- CPF banido (`bloqueado_novo_cadastro = true`) não reabre a conta: 403 "Não é possível criar conta com esse CPF. Fale com o suporte."
-  Quem marca é a administração; a tela é a US25.
-- Conta ativa ou inativa com o mesmo CPF continua recusando um cadastro novo (409), como antes.
-
-**Mudança em relação à decisão anterior do grupo:** a versão antiga criava uma conta nova ligada à anterior por `conta_anterior_id`,
-e toda consulta de reputação precisaria percorrer essa corrente. Reabrir o mesmo registro dá o mesmo resultado sem corrente:
-avaliações (US24), contagem de serviços concluídos para a taxa (US21) e cancelamentos seguem o `id` sem consulta especial.
-**Levar ao grupo** para atualizar a base de decisões.
-
-### LGPD
-
-A impressão é HMAC-SHA256 com a chave `CPF_PEPPER` do `.env` (só existem 10^11 CPFs, então um SHA-256 puro seria revertido por
-força bruta). Sem a chave, o banco não devolve nenhum CPF. Mesmo assim ela é dado pessoal pseudonimizado, guardado com uma
-finalidade: prevenção a fraude. O aceite em **Criar conta** e a tela **Apagar meus dados** passaram a avisar isso; falta colocar
-nos termos de uso (pendência já listada no guia).
-
-### Como foi feito
-
-- `utils/cpf.js`: `impressaoCpf` (HMAC com `CPF_PEPPER`; em produção, sem a chave, a API recusa em vez de usar a chave de desenvolvimento).
-- `models/Usuario.js`: colunas `cpf_hash` (única) e `bloqueado_novo_cadastro`.
-- `controllers/authController.js` (`cadastrar`): grava a impressão; procura conta ativa/inativa por e-mail, CPF ou impressão (409);
-  procura conta `excluido` pela impressão (403 se banida; senão reabre).
-- `servicos/reabertura.js` (novo): `reabrirConta`, numa transação: dados novos, status `ativo`, novo aceite dos termos,
-  `token_versao` + 1 e perfil de prestador de volta a `ativo` (vazio).
-- `servicos/anonimizacao.js`: mantém a impressão (e cria para contas antigas que ainda não tinham), invalida links de senha pendentes
-  e sobe o `token_versao`.
-- `controllers/contaController.js`: a mensagem depois de apagar deixou de dizer "Essa conta não volta".
-- Front: aviso de conta reaberta com botão **Continuar** em **Criar conta**; textos novos no aceite dos termos e em **Apagar meus dados**.
-- `.env.example` (`CPF_PEPPER`), `schema.sql`, `README.md` e `GUIA-APRESENTACAO-SPRINT1.md` atualizados.
-
-### Banco de dados
-
-`sequelize.sync()` não cria colunas em tabela existente. Quem já tem o banco precisa rodar uma vez:
-
-```sql
-ALTER TABLE usuarios
-  ADD COLUMN cpf_hash VARCHAR(64) NULL AFTER cpf,
-  ADD UNIQUE INDEX cpf_hash (cpf_hash),
-  ADD COLUMN bloqueado_novo_cadastro TINYINT(1) NOT NULL DEFAULT 0 AFTER token_versao;
-```
-
-Contas já existentes ficam com `cpf_hash` vazio até apagarem os dados (a impressão é criada nessa hora) e continuam barrando
-cadastro repetido pelo CPF. Contas que foram apagadas **antes** desta mudança não têm impressão e não são reconhecidas: eram contas de teste.
-
-Defina a `CPF_PEPPER` no `backend/.env` antes de criar contas e não troque depois.
-
-### Testes
-
-`npm run teste`: **121 critérios, 0 falhas** (eram 107). Saiu "após apagar os dados o CPF fica livre"; entraram 15, e 10 deles falhavam no código anterior:
-
-- o cadastro já grava a impressão do CPF, não o número; apagar tira o CPF e guarda a impressão
-- cadastro com o mesmo CPF reabre a **mesma** conta (mesmo `id`), ativa, com os dados novos e o CPF de volta; os dados antigos não voltam
-- o histórico continua ligado à mesma conta; entra com o e-mail e a senha novos
-- token e link de senha de antes da exclusão não valem na conta reaberta
-- com a conta reaberta, o mesmo CPF volta a ser recusado; CPF diferente cria conta nova
-- CPF banido não reabre nem cria conta
-- prestadora que apagou volta com perfil vazio, aparece de novo na listagem e consegue pausar
-
-O build do frontend compila sem erros. A tela de conta reaberta foi conferida no navegador (largura de celular).
-
-### Como conferir à mão
-
-1. Crie uma conta, desative e use **Apagar meus dados**.
-2. No Workbench: `SELECT id, nome, cpf, cpf_hash, status FROM usuarios;` → sem CPF, com `cpf_hash`, status `excluido`.
-3. Em **Criar conta**, use o mesmo CPF com outro e-mail → aviso de conta reaberta → **Continuar**.
-4. Repita o `SELECT`: mesmo `id`, status `ativo`.
-

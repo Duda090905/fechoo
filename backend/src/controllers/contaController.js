@@ -93,8 +93,7 @@ async function reativar(req, res, next) {
 /**
  * US04 - Exclusao definitiva (LGPD).
  *
- * So depois de a conta estar inativa. Apaga nome, e-mail, CPF, telefone,
- * senha e foto; guarda a impressao do CPF (ver servicos/anonimizacao.js).
+ * So depois de a conta estar inativa. Apaga nome, e-mail, CPF e telefone.
  */
 async function excluirDefinitivo(req, res, next) {
   try {
@@ -120,9 +119,7 @@ async function excluirDefinitivo(req, res, next) {
     await anonimizarConta(usuario);
     await registrarSolicitacao(usuario.id, 'exclusao_dados', 'concluida');
 
-    return res.json({
-      mensagem: 'Seus dados pessoais foram apagados. Se você se cadastrar de novo com o mesmo CPF, volta para esta mesma conta.'
-    });
+    return res.json({ mensagem: 'Seus dados pessoais foram apagados. Essa conta nao volta.' });
   } catch (e) {
     return next(e);
   }

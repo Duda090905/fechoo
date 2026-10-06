@@ -33,7 +33,7 @@ As tabelas são criadas pela própria aplicação ao iniciar. O arquivo `backend
 ```bash
 cd backend
 npm install
-cp .env.example .env     # preencha DB_USER, DB_PASS e CPF_PEPPER
+cp .env.example .env     # preencha DB_USER e DB_PASS
 npm run db:seed          # carrega áreas, categorias e bairros
 npm run dev              # http://localhost:3333
 ```
@@ -104,11 +104,7 @@ Os ícones são SVG escritos à mão em `componentes/Icones.jsx` — o projeto n
 
 *Desativar* é o caminho normal e não apaga nada. A conta vira `inativo`: sai das buscas e perde o acesso, mas cadastro e histórico continuam guardados. Para voltar, basta entrar e reativar — tudo volta como estava.
 
-*Apagar os dados* é o direito da LGPD, disponível só depois de a conta estar inativa. Nome, e-mail, CPF, telefone, senha e a foto de perfil (inclusive o arquivo no disco) são apagados. Ficam o registro da conta, com o histórico, e a impressão do CPF.
-
-**Um CPF, uma conta (US04).** Quem apaga os dados não ganha uma conta nova e limpa. O cadastro grava a impressão do CPF (`cpf_hash`, HMAC-SHA256 com a chave `CPF_PEPPER` do `.env`), e ela continua no banco depois de apagar. Se a pessoa se cadastrar de novo com o mesmo CPF, o sistema reabre **a mesma conta** (mesmo `id`): ela preenche os dados pessoais de novo, e tudo o que estiver ligado a esse `id` (serviços, avaliações, cancelamentos, disputas e a contagem de serviços da taxa, nos próximos sprints) continua valendo. O perfil de prestador recomeça vazio. Tokens e links de troca de senha emitidos antes da exclusão não voltam a valer. CPF banido pela administração (`bloqueado_novo_cadastro`, tela na US25) não reabre a conta.
-
-Por que HMAC e não hash simples: só existem 10^11 CPFs, então um SHA-256 puro seria revertido em minutos. Sem a `CPF_PEPPER`, quem copiar o banco não reconstrói nenhum CPF. A chave é definida uma vez e nunca mais trocada. A impressão continua sendo dado pessoal (pseudonimizado); a finalidade é prevenção a fraude e precisa constar nos termos de uso.
+*Apagar os dados* é o direito da LGPD, disponível só depois de a conta estar inativa. Nome, e-mail, CPF, telefone, senha e a foto de perfil (inclusive o arquivo no disco) são apagados.
 
 Os dois caminhos são bloqueados enquanto houver pendência em aberto.
 **Pendências.** A regra de bloqueio mora em `src/servicos/pendencias.js`. Cada módulo que cria compromisso entre duas pessoas registra o seu verificador ali; o controller de conta não precisa ser alterado. No Sprint 1 não há nenhum registrado, porque Serviços e Disputas só existem a partir do Sprint 2 — o arquivo traz comentado o formato exato do verificador que o módulo de serviços vai registrar. O teste automatizado registra um verificador falso para provar que o bloqueio funciona.

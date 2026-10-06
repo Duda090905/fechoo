@@ -20,6 +20,11 @@ async function autenticar(req, res, next) {
       return res.status(401).json({ erro: 'Sessao invalida. Entre novamente.' });
     }
 
+    // Senha trocada depois da emissao do token: sessao encerrada.
+    if ((dados.v || 0) !== (usuario.token_versao || 0)) {
+      return res.status(401).json({ erro: 'Sessao encerrada. Entre novamente.' });
+    }
+
     req.usuario = usuario;
     return next();
   } catch (e) {

@@ -1,27 +1,16 @@
-const { Prestador } = require('../models');
-const { impressaoCpf } = require('../utils/cpf');
+const { Prestador, SolicitacaoExclusao } = require('../models');
 const { listarPendencias } = require('../servicos/pendencias');
+const { iniciarPausa } = require('../servicos/pausas');
+const { anonimizarConta } = require('../servicos/anonimizacao');
+
+// US04 - registra data (created_at), origem e resultado de cada pedido.
+function registrarSolicitacao(usuarioId, tipo, resultado) {
+  return SolicitacaoExclusao.create({ usuario_id: usuarioId, tipo, origem: 'painel_usuario', resultado });
+}
 
 // US02 - dados da propria conta
 async function meusDados(req, res) {
   return res.json({ usuario: req.usuario.publico() });
-}
-
-// US01 - edicao dos dados cadastrais
-async function atualizar(req, res, next) {
-  try {
-    const { nome, telefone, sexo } = req.body;
-    const usuario = req.usuario;
-
-    if (nome) usuario.nome = nome;
-    if (telefone !== undefined) usuario.telefone = telefone;
-    if (sexo) usuario.sexo = sexo;
-    await usuario.save();
-
-    return res.json({ usuario: usuario.publico() });
-  } catch (e) {
-    return next(e);
-  }
 }
 
 // US04 - o que impede sair
@@ -38,8 +27,7 @@ async function pendencias(req, res, next) {
  * US04 - Desativar a conta.
  *
  * Nao apaga nada. A conta vira "inativa": some das buscas, perde o acesso,
- * mas o cadastro, o historico e a reputacao continuam guardados. Quem tenta
- * fugir de uma avaliacao ruim criando conta nova esbarra no mesmo CPF.
+ * mas o cadastro e o historico continuam guardados.
  */
 async function desativar(req, res, next) {
   try {
@@ -50,6 +38,7 @@ async function desativar(req, res, next) {
 
     const lista = await listarPendencias(req.usuario.id);
     if (lista.length) {
+      await registrarSolicitacao(req.usuario.id, 'desativacao', 'recusada_pendencia');
       return res.status(409).json({
         erro: 'Voce tem pendencias em aberto. Resolva antes de desativar a conta.',
         pendencias: lista
@@ -63,10 +52,9 @@ async function desativar(req, res, next) {
 
     const prestador = await Prestador.findOne({ where: { usuario_id: usuario.id } });
     if (prestador && prestador.status === 'ativo') {
-      prestador.status = 'pausado';
-      prestador.pausado_em = new Date();
-      await prestador.save();
+      await iniciarPausa(prestador);
     }
+    await registrarSolicitacao(usuario.id, 'desativacao', 'concluida');
 
     return res.json({
       mensagem: 'Conta desativada. Seus dados ficam guardados e voce pode voltar quando quiser.'
@@ -105,9 +93,8 @@ async function reativar(req, res, next) {
 /**
  * US04 - Exclusao definitiva (LGPD).
  *
- * So depois de a conta estar inativa. Apaga nome, e-mail, CPF e telefone.
- * Fica apenas o hash do CPF, para reconhecer reincidencia sem guardar o
- * documento - base legal: prevencao a fraude.
+ * So depois de a conta estar inativa. Apaga nome, e-mail, CPF, telefone,
+ * senha e foto; guarda a impressao do CPF (ver servicos/anonimizacao.js).
  */
 async function excluirDefinitivo(req, res, next) {
   try {
@@ -123,39 +110,22 @@ async function excluirDefinitivo(req, res, next) {
 
     const lista = await listarPendencias(usuario.id);
     if (lista.length) {
+      await registrarSolicitacao(usuario.id, 'exclusao_dados', 'recusada_pendencia');
       return res.status(409).json({
         erro: 'Voce tem pendencias em aberto. Resolva antes de apagar seus dados.',
         pendencias: lista
       });
     }
 
-    const prestador = await Prestador.findOne({ where: { usuario_id: usuario.id } });
-    if (prestador) {
-      prestador.status = 'suspenso';
-      prestador.descricao = null;
-      prestador.foto_url = null;
-      await prestador.save();
-      await prestador.setCategorias([]);
-      await prestador.setBairros([]);
-    }
+    await anonimizarConta(usuario);
+    await registrarSolicitacao(usuario.id, 'exclusao_dados', 'concluida');
 
-    // A impressao do CPF fica, o CPF sai. E o que permite reconhecer
-    // a pessoa se ela voltar, sem guardar o documento.
-    usuario.cpf_hash = usuario.cpf ? impressaoCpf(usuario.cpf) : null;
-    usuario.nome = 'Usuario removido';
-    usuario.email = null;
-    usuario.cpf = null;
-    usuario.telefone = null;
-    usuario.senha_hash = null;
-    usuario.sexo = 'nao_informado';
-    usuario.status = 'excluido';
-    usuario.excluido_em = new Date();
-    await usuario.save();
-
-    return res.json({ mensagem: 'Seus dados pessoais foram apagados. Essa conta nao volta.' });
+    return res.json({
+      mensagem: 'Seus dados pessoais foram apagados. Se você se cadastrar de novo com o mesmo CPF, volta para esta mesma conta.'
+    });
   } catch (e) {
     return next(e);
   }
 }
 
-module.exports = { meusDados, atualizar, pendencias, desativar, reativar, excluirDefinitivo };
+module.exports = { meusDados, pendencias, desativar, reativar, excluirDefinitivo };

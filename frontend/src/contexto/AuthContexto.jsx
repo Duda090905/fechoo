@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api } from '../servicos/api';
+import { api, SESSAO_EXPIRADA } from '../servicos/api';
 
 const AuthContexto = createContext(null);
 
@@ -27,6 +27,19 @@ function usuarioSalvo() {
 export function ProvedorAuth({ children }) {
   const [usuario, setUsuario] = useState(usuarioSalvo);
   const [carregando, setCarregando] = useState(true);
+  const [sessaoExpirada, setSessaoExpirada] = useState(false);
+
+  // Qualquer chamada autenticada que volte 401 derruba a sessao; as rotas
+  // privadas mandam a pessoa para o login.
+  useEffect(() => {
+    function aoExpirar() {
+      limpar();
+      setUsuario(null);
+      setSessaoExpirada(true);
+    }
+    window.addEventListener(SESSAO_EXPIRADA, aoExpirar);
+    return () => window.removeEventListener(SESSAO_EXPIRADA, aoExpirar);
+  }, []);
 
   useEffect(() => {
     let ativo = true;
@@ -51,8 +64,10 @@ export function ProvedorAuth({ children }) {
   const valor = useMemo(() => ({
     usuario,
     carregando,
+    sessaoExpirada,
     autenticar(token, dadosUsuario) {
       guardar(token, dadosUsuario);
+      setSessaoExpirada(false);
       setUsuario(dadosUsuario);
     },
     atualizarUsuario(dadosUsuario) {
@@ -61,9 +76,10 @@ export function ProvedorAuth({ children }) {
     },
     sair() {
       limpar();
+      setSessaoExpirada(false);
       setUsuario(null);
     }
-  }), [usuario, carregando]);
+  }), [usuario, carregando, sessaoExpirada]);
 
   return <AuthContexto.Provider value={valor}>{children}</AuthContexto.Provider>;
 }

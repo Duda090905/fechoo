@@ -12,9 +12,7 @@ class Prestador extends Model {
       status: { type: DataTypes.ENUM('ativo', 'pausado', 'suspenso'), defaultValue: 'ativo' },
       pausado_em: { type: DataTypes.DATE, allowNull: true },
       // US08 - opcao da propria prestadora, nunca marcada por padrao
-      atende_apenas_mulheres: { type: DataTypes.BOOLEAN, defaultValue: false },
-      // US06 (sprint seguinte) - o campo ja nasce aqui
-      verificado: { type: DataTypes.BOOLEAN, defaultValue: false }
+      atende_apenas_mulheres: { type: DataTypes.BOOLEAN, defaultValue: false }
     }, { sequelize, tableName: 'prestadores' });
   }
 

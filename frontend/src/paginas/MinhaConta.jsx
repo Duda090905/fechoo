@@ -5,50 +5,23 @@ import { useAuth } from '../contexto/AuthContexto';
 import Campo from '../componentes/Campo';
 import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
+import { formatarTelefone } from '../utils/formatos';
 import './painel.css';
 
 export default function MinhaConta() {
   const { usuario, atualizarUsuario, sair } = useAuth();
   const inativa = usuario?.status === 'inativo';
 
-  const [form, setForm] = useState({ nome: '', telefone: '', sexo: 'nao_informado' });
-  const [editando, setEditando] = useState(false);
   const [pendencias, setPendencias] = useState([]);
   const [etapa, setEtapa] = useState('nenhuma'); // nenhuma | desativar | apagar
   const [confirmacao, setConfirmacao] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [salvando, setSalvando] = useState(false);
   const navegar = useNavigate();
-
-  useEffect(() => {
-    if (usuario) {
-      setForm({
-        nome: usuario.nome || '',
-        telefone: usuario.telefone || '',
-        sexo: usuario.sexo || 'nao_informado'
-      });
-    }
-  }, [usuario]);
 
   useEffect(() => {
     api.pendencias().then((d) => setPendencias(d.pendencias || [])).catch(() => setPendencias([]));
   }, []);
-
-  async function salvar(evento) {
-    evento.preventDefault();
-    setErro(''); setMensagem(''); setSalvando(true);
-    try {
-      const dados = await api.atualizarConta(form);
-      atualizarUsuario(dados.usuario);
-      setEditando(false);
-      setMensagem('Dados atualizados.');
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setSalvando(false);
-    }
-  }
 
   async function reativar() {
     setErro(''); setMensagem('');
@@ -106,64 +79,39 @@ export default function MinhaConta() {
           <h2>Sua conta está desativada</h2>
           <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
             Ninguém te encontra nas buscas e você não consegue contratar nem ser contratada.
-            Seu cadastro, seu histórico e suas avaliações continuam guardados.
+            Seu cadastro, seu histórico e suas avaliações continuam guardados por 12 meses. Se você não
+            voltar nesse prazo, seus dados pessoais são apagados, e avisamos por e-mail 30 dias antes.
           </p>
           <Botao type="button" onClick={reativar}>Reativar minha conta</Botao>
         </div>
       )}
 
       <div className="cartao">
-        <div className="entre" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>Meus dados</h2>
-          {!editando && !inativa && (
-            <Botao tipo="secundario" className="botao--curto" type="button" onClick={() => setEditando(true)}>
-              Editar
-            </Botao>
-          )}
-        </div>
-
-        {!editando ? (
-          <div>
-            <div className="dado">
-              <span className="dado__rotulo">Nome</span>
-              <span className="dado__valor">{usuario?.nome}</span>
-            </div>
-            <div className="dado">
-              <span className="dado__rotulo">Telefone</span>
-              <span className="dado__valor">{usuario?.telefone || 'não informado'}</span>
-            </div>
-            <div className="dado">
-              <span className="dado__rotulo">Tipo de perfil</span>
-              <span className="dado__valor">
-                {usuario?.tipo_perfil === 'prestador' ? 'Prestador de serviço' : 'Contratante'}
-              </span>
-            </div>
+        <h2>Meus dados</h2>
+        <div>
+          <div className="dado">
+            <span className="dado__rotulo">Nome</span>
+            <span className="dado__valor">{usuario?.nome}</span>
           </div>
-        ) : (
-          <form onSubmit={salvar}>
-            <Campo etiqueta="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
-            <Campo etiqueta="Telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} inputMode="tel" />
-            <Campo etiqueta="Sexo" ajuda="Opcional. Usado apenas no filtro de segurança entre mulheres.">
-              <select value={form.sexo} onChange={(e) => setForm({ ...form, sexo: e.target.value })}>
-                <option value="nao_informado">Prefiro não informar</option>
-                <option value="feminino">Feminino</option>
-                <option value="masculino">Masculino</option>
-              </select>
-            </Campo>
-            <div className="empilha">
-              <Botao type="submit" carregando={salvando}>Salvar alterações</Botao>
-              <Botao tipo="secundario" type="button" onClick={() => setEditando(false)}>Cancelar</Botao>
-            </div>
-          </form>
-        )}
+          <div className="dado">
+            <span className="dado__rotulo">Telefone</span>
+            <span className="dado__valor">{formatarTelefone(usuario?.telefone) || 'não informado'}</span>
+          </div>
+          <div className="dado">
+            <span className="dado__rotulo">Tipo de perfil</span>
+            <span className="dado__valor">
+              {usuario?.tipo_perfil === 'prestador' ? 'Prestador de serviço' : 'Contratante'}
+            </span>
+          </div>
+        </div>
       </div>
-
       {!inativa && (
         <div className="cartao cartao--perigo">
           <h2>Desativar minha conta</h2>
           <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
             Você sai das buscas e perde o acesso, mas nada é apagado. Dá para voltar quando quiser,
-            com o mesmo histórico e as mesmas avaliações.
+            com o mesmo histórico e as mesmas avaliações. Se você ficar 12 meses sem voltar, seus dados
+            pessoais são apagados; avisamos por e-mail 30 dias antes.
           </p>
 
           {pendencias.length > 0 && (
@@ -200,8 +148,10 @@ export default function MinhaConta() {
         <div className="cartao cartao--perigo">
           <h2>Apagar meus dados</h2>
           <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
-            Apaga nome, e-mail, CPF e telefone em definitivo, conforme a LGPD. A conta não volta
-            e você não recupera suas avaliações.
+            Apaga seu nome, e-mail, CPF, telefone, senha e foto, conforme a LGPD. Guardamos só um código
+            gerado do seu CPF, que não permite descobrir o número, e o histórico da conta, sem o seu nome.
+            Se um dia você se cadastrar de novo com o mesmo CPF, volta para esta mesma conta: preenche os
+            dados de novo, e o histórico continua o mesmo.
           </p>
 
           {etapa !== 'apagar' ? (

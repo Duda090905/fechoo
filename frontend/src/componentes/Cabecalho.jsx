@@ -21,7 +21,6 @@ export default function Cabecalho() {
     <>
       {naHome && !usuario && (
         <>
-          <a href="#como-funciona" onClick={() => setAberto(false)}>Como funciona</a>
           <a href="#servicos" onClick={() => setAberto(false)}>Serviços</a>
         </>
       )}

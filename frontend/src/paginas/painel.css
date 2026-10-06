@@ -79,3 +79,11 @@
 
 .cartao--perigo { border-color: #F0C2C2; }
 .cartao--perigo h2 { color: var(--vermelho); }
+
+.foto-editor { display: flex; gap: 16px; align-items: flex-start; }
+.foto-editor .ficha__avatar {
+  flex: 0 0 56px; width: 56px; height: 56px; margin-top: 4px;
+  border-radius: 17px; display: grid; place-items: center;
+  background: var(--azul-noite); color: #fff;
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 23px;
+}

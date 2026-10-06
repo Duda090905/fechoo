@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 
 function gerarJWT(usuario) {
   return jwt.sign(
-    { id: usuario.id, tipo_perfil: usuario.tipo_perfil },
+    { id: usuario.id, tipo_perfil: usuario.tipo_perfil, v: usuario.token_versao || 0 },
     process.env.JWT_SECRET || 'segredo-de-desenvolvimento',
     { expiresIn: process.env.JWT_EXPIRA || '8h' }
   );

@@ -7,7 +7,7 @@ export default function Rodape() {
       <div className="rodape__interno">
         <div className="rodape__marca">
           <span className="marca">Fechô</span>
-          <p>Serviço contratado, dinheiro garantido.</p>
+          <p>O profissional certo, perto de você.</p>
         </div>
 
         <div className="rodape__colunas">
@@ -15,20 +15,13 @@ export default function Rodape() {
             <h4>Plataforma</h4>
             <Link to="/prestadores">Encontrar profissional</Link>
             <Link to="/criar-conta">Oferecer serviços</Link>
-            <a href="/#como-funciona">Como funciona</a>
-          </div>
-          <div>
-            <h4>Confiança</h4>
-            <a href="/#seguranca">Pagamento retido</a>
-            <a href="/#perguntas">Perguntas frequentes</a>
           </div>
         </div>
       </div>
 
       <div className="rodape__base">
         <p>
-          Projeto acadêmico desenvolvido na PUC-Campinas. Os pagamentos rodam em ambiente
-          de homologação e não há movimentação financeira real.
+          Projeto acadêmico desenvolvido na PUC-Campinas.
         </p>
       </div>
     </footer>

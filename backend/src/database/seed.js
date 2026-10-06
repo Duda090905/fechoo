@@ -17,16 +17,14 @@ const CATALOGO = [
   { area: 'Area externa', categorias: ['Jardinagem', 'Dedetizacao'] }
 ];
 
+// Bairros de exemplo; a lista oficial entra em outro momento.
 const BAIRROS = [
-  ['Barao Geraldo', 'Norte'], ['Cambui', 'Central'], ['Centro', 'Central'],
-  ['Bosque', 'Central'], ['Botafogo', 'Central'], ['Guanabara', 'Central'],
-  ['Taquaral', 'Norte'], ['Jardim Chapadao', 'Norte'], ['Mansoes Santo Antonio', 'Sul'],
-  ['Nova Campinas', 'Sul'], ['Jardim Guanabara', 'Norte'], ['Vila Industrial', 'Leste'],
-  ['Jardim do Lago', 'Sul'], ['Ponte Preta', 'Sul'], ['Swift', 'Sul'],
-  ['Jardim Proenca', 'Norte'], ['Sousas', 'Leste'], ['Joaquim Egidio', 'Leste'],
-  ['Campo Grande', 'Oeste'], ['Jardim Eulina', 'Oeste'], ['Vila Uniao', 'Oeste'],
-  ['Parque Prado', 'Sul'], ['Jardim Nova Europa', 'Leste'], ['Cidade Universitaria', 'Norte'],
-  ['Vila Nova', 'Central']
+  'Barao Geraldo', 'Cambui', 'Centro', 'Bosque', 'Botafogo', 'Guanabara',
+  'Taquaral', 'Jardim Chapadao', 'Mansoes Santo Antonio', 'Nova Campinas',
+  'Jardim Guanabara', 'Vila Industrial', 'Jardim do Lago', 'Ponte Preta',
+  'Swift', 'Jardim Proenca', 'Sousas', 'Joaquim Egidio', 'Campo Grande',
+  'Jardim Eulina', 'Vila Uniao', 'Parque Prado', 'Jardim Nova Europa',
+  'Cidade Universitaria', 'Vila Nova'
 ];
 
 async function rodar() {
@@ -43,8 +41,8 @@ async function rodar() {
     }
   }
 
-  for (const [nome, regiao] of BAIRROS) {
-    await Bairro.findOrCreate({ where: { nome, cidade: 'Campinas' }, defaults: { nome, cidade: 'Campinas', regiao } });
+  for (const nome of BAIRROS) {
+    await Bairro.findOrCreate({ where: { nome, cidade: 'Campinas' }, defaults: { nome, cidade: 'Campinas' } });
   }
 
   const totalCategorias = await Categoria.count();

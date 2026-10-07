@@ -110,7 +110,6 @@ async function entrar(req, res, next) {
 }
 
 // US03 - Pedir o link
-// US03 - Pedir o link
 async function esqueciSenha(req, res, next) {
   try {
     const email = normalizarEmail(req.body.email);
@@ -118,13 +117,7 @@ async function esqueciSenha(req, res, next) {
     const resposta = { mensagem: 'Se existir uma conta com esse e-mail, o link chega em instantes.' };
 
     const usuario = await Usuario.findOne({ where: { email, status: 'ativo' } });
-    if (!usuario) {
-      // So no log do servidor e fora de producao: o front continua sem saber.
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('\n[recuperacao de senha] nenhum link gerado: nao ha conta ATIVA com', email, '\n');
-      }
-      return res.json(resposta);
-    }
+    if (!usuario) return res.json(resposta);
 
     const { bruto, hash } = gerarTokenRecuperacao();
     await TokenSenha.create({

@@ -9,9 +9,6 @@ if (process.env.SMTP_HOST) {
     port: Number(process.env.SMTP_PORT || 2525),
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
   });
-  console.log(`[e-mail] modo SMTP (${process.env.SMTP_HOST}): os links vao para a caixa de entrada, nao para o console.`);
-} else {
-  console.log('[e-mail] modo console: links de recuperacao aparecem neste terminal.');
 }
 
 async function enviarLinkRecuperacao(email, link) {

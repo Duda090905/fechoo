@@ -48,4 +48,28 @@ async function enviarAvisoRetencao(email, dataLimite) {
   return { simulado: false };
 }
 
-module.exports = { enviarLinkRecuperacao, enviarAvisoRetencao };
+// US13 - lembrete da vespera do atendimento, para as duas partes.
+// Vai sem endereco: o e-mail so diz quando e com quem.
+async function enviarLembreteServico(email, { horario, outraParte, descricao }) {
+  const quando = new Date(horario).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
+  });
+  const texto = `Lembrete do Fechô: seu atendimento com ${outraParte} está marcado para ${quando}.\n\n`
+    + `Pedido: ${descricao}\n\nQualquer combinado, use o chat do serviço.`;
+
+  if (!transporte) {
+    console.log('\n[lembrete] destinatario:', email);
+    console.log('[lembrete]', texto.replace(/\n+/g, ' '), '\n');
+    return { simulado: true };
+  }
+
+  await transporte.sendMail({
+    from: 'Fecho <nao-responda@fecho.app>',
+    to: email,
+    subject: 'Lembrete do seu atendimento no Fechô',
+    text: texto
+  });
+  return { simulado: false };
+}
+
+module.exports = { enviarLinkRecuperacao, enviarAvisoRetencao, enviarLembreteServico };

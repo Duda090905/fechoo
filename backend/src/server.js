@@ -2,6 +2,8 @@ require('dotenv').config();
 const app = require('./app');
 const { sequelize } = require('./models');
 const { iniciarRotinaRetencao } = require('./servicos/retencao');
+const { iniciarRotinaLembretes } = require('./servicos/lembretes');
+const { iniciarRotinaRetencaoMidias } = require('./servicos/retencaoMidias');
 
 const porta = Number(process.env.PORT || 3333);
 
@@ -12,6 +14,8 @@ async function iniciar() {
     await sequelize.sync();
     app.listen(porta, () => console.log(`API do Fecho rodando em http://localhost:${porta}`));
     iniciarRotinaRetencao();
+    iniciarRotinaLembretes(); // US13
+    iniciarRotinaRetencaoMidias(); // US12
   } catch (e) {
     console.error('Nao consegui conectar no banco:', e.message);
     process.exit(1);

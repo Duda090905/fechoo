@@ -1,10 +1,12 @@
-const { Prestador, Usuario, Categoria, Bairro } = require('../models');
+const { Op, fn, col } = require('sequelize');
+const { Prestador, Usuario, Categoria, Bairro, Servico } = require('../models');
 const { iniciarPausa, retomar } = require('../servicos/pausas');
 const { detectarTipo, salvarFotoPerfil, removerFotoPerfil, urlPublica } = require('../servicos/armazenamento');
 
 const LIMITE_CATEGORIAS = 5;
 
-function montarPerfil(prestador) {
+// US09 - o cartao do prestador leva nome, nota media, servicos concluidos e selo.
+function montarPerfil(prestador, servicosConcluidos = 0) {
   return {
     id: prestador.id,
     nome: prestador.usuario ? prestador.usuario.nome : null,
@@ -13,6 +15,9 @@ function montarPerfil(prestador) {
     foto_url: urlPublica(prestador.foto_url),
     status: prestador.status,
     atende_apenas_mulheres: prestador.atende_apenas_mulheres,
+    nota_media: prestador.nota_media === null || prestador.nota_media === undefined ? null : Number(prestador.nota_media),
+    servicos_concluidos: servicosConcluidos,
+    verificado: Boolean(prestador.verificado),
     categorias: (prestador.categorias || []).map((c) => ({ id: c.id, nome: c.nome })),
     bairros: (prestador.bairros || []).map((b) => ({ id: b.id, nome: b.nome }))
   };
@@ -32,7 +37,8 @@ async function meuPerfil(req, res, next) {
       include: INCLUDES
     });
     if (!prestador) return res.json({ prestador: null });
-    return res.json({ prestador: montarPerfil(prestador) });
+    const concluidos = await contarConcluidos([prestador.id]);
+    return res.json({ prestador: montarPerfil(prestador, concluidos.get(prestador.id) || 0) });
   } catch (e) {
     return next(e);
   }
@@ -102,7 +108,8 @@ async function salvarPerfil(req, res, next) {
     if (bairros) await prestador.setBairros(bairros);
 
     const atualizado = await Prestador.findByPk(prestador.id, { include: INCLUDES });
-    return res.json({ prestador: montarPerfil(atualizado) });
+    const concluidos = await contarConcluidos([prestador.id]);
+    return res.json({ prestador: montarPerfil(atualizado, concluidos.get(prestador.id) || 0) });
   } catch (e) {
     return next(e);
   }
@@ -182,27 +189,87 @@ async function alternarPausa(req, res, next) {
   }
 }
 
-// Listagem simples (prova que US05, US07 e US08 funcionam).
-// Os filtros de categoria e bairro e a ordenacao por avaliacao sao a US09.
+// Id opcional vindo da URL: vazio vira null; qualquer coisa que nao seja
+// inteiro positivo vira undefined (invalido).
+function idOpcional(valor) {
+  if (valor === undefined || valor === '') return null;
+  const id = Number(valor);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
+// US09 - quantos servicos concluidos cada prestador tem.
+async function contarConcluidos(ids) {
+  if (!ids.length) return new Map();
+  const linhas = await Servico.findAll({
+    attributes: ['id_prestador', [fn('COUNT', col('id')), 'total']],
+    where: { id_prestador: ids, status: Servico.STATUS_CONCLUIDOS },
+    group: ['id_prestador'],
+    raw: true
+  });
+  return new Map(linhas.map((l) => [l.id_prestador, Number(l.total)]));
+}
+
+// US09 - avaliacao media (sem nota vai para o fim), depois servicos
+// concluidos. Empate: quem se cadastrou primeiro.
+function ordenarParaBusca(a, b) {
+  const notaA = a.nota_media === null ? -1 : a.nota_media;
+  const notaB = b.nota_media === null ? -1 : b.nota_media;
+  if (notaA !== notaB) return notaB - notaA;
+  if (a.servicos_concluidos !== b.servicos_concluidos) return b.servicos_concluidos - a.servicos_concluidos;
+  return a.id - b.id;
+}
+
+/**
+ * US09 - Busca por categoria e bairro.
+ *
+ * Filtros opcionais na URL: categoria, bairro (ids) e somente_mulheres (US08).
+ * So aparece prestador ativo (pausado e suspenso saem), com conta ativa e com
+ * ao menos uma categoria e um bairro.
+ *
+ * Dois passos: o primeiro descobre quem passa nos filtros; o segundo carrega o
+ * perfil completo. Assim, filtrar por uma categoria nao esconde as outras
+ * categorias do cartao.
+ */
 async function listar(req, res, next) {
   try {
+    const categoria = idOpcional(req.query.categoria);
+    const bairro = idOpcional(req.query.bairro);
+    if (categoria === undefined) return res.status(400).json({ erro: 'Categoria inválida.' });
+    if (bairro === undefined) return res.status(400).json({ erro: 'Bairro inválido.' });
+
     const usuarioWhere = { status: 'ativo' };
     if (req.query.somente_mulheres === 'true') usuarioWhere.sexo = 'feminino';
 
-    // required: true em tudo, entao prestador pausado, sem categoria ou sem
-    // bairro nao aparece.
-    const prestadores = await Prestador.findAll({
+    const elegiveis = await Prestador.findAll({
+      attributes: ['id'],
       where: { status: 'ativo' },
       include: [
-        { model: Usuario, as: 'usuario', attributes: ['nome', 'sexo'], where: usuarioWhere, required: true },
-        { model: Categoria, as: 'categorias', attributes: ['id', 'nome'], through: { attributes: [] }, required: true },
-        { model: Bairro, as: 'bairros', attributes: ['id', 'nome'], through: { attributes: [] }, required: true }
-      ],
-      order: [['id', 'ASC']]
+        { model: Usuario, as: 'usuario', attributes: [], where: usuarioWhere, required: true },
+        {
+          model: Categoria, as: 'categorias', attributes: [], through: { attributes: [] }, required: true,
+          ...(categoria ? { where: { id: categoria } } : {})
+        },
+        {
+          model: Bairro, as: 'bairros', attributes: [], through: { attributes: [] }, required: true,
+          ...(bairro ? { where: { id: bairro } } : {})
+        }
+      ]
     });
-    return res.json({ prestadores: prestadores.map(montarPerfil) });
+    const ids = [...new Set(elegiveis.map((p) => p.id))];
+    if (!ids.length) return res.json({ prestadores: [] });
+
+    const [prestadores, concluidos] = await Promise.all([
+      Prestador.findAll({ where: { id: { [Op.in]: ids } }, include: INCLUDES }),
+      contarConcluidos(ids)
+    ]);
+
+    const resultado = prestadores
+      .map((p) => montarPerfil(p, concluidos.get(p.id) || 0))
+      .sort(ordenarParaBusca);
+    return res.json({ prestadores: resultado });
   } catch (e) {
     return next(e);
   }
 }
+
 module.exports = { meuPerfil, salvarPerfil, enviarFoto, removerFoto, alternarPausa, listar };

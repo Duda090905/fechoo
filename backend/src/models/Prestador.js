@@ -1,6 +1,6 @@
 const { DataTypes, Model } = require('sequelize');
 
-// US05 / US07 / US08 - perfil profissional.
+// US05 / US07 / US08 / US09 - perfil profissional.
 class Prestador extends Model {
   static init(sequelize) {
     return super.init({
@@ -12,19 +12,30 @@ class Prestador extends Model {
       status: { type: DataTypes.ENUM('ativo', 'pausado', 'suspenso'), defaultValue: 'ativo' },
       pausado_em: { type: DataTypes.DATE, allowNull: true },
       // US08 - opcao da propria prestadora, nunca marcada por padrao
-      atende_apenas_mulheres: { type: DataTypes.BOOLEAN, defaultValue: false }
-    }, { sequelize, tableName: 'prestadores' });
+      atende_apenas_mulheres: { type: DataTypes.BOOLEAN, defaultValue: false },
+      // US09 - a busca ordena por esta nota e o cartao a exibe. Vazia ate
+      // existirem avaliacoes: quem calcula e grava a media e a US24.
+      nota_media: { type: DataTypes.DECIMAL(3, 2), allowNull: true },
+      // US09 - o cartao da busca exibe o selo. Quem verifica a identidade e
+      // marca o campo e a US06; ate la, ninguem tem o selo.
+      verificado: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
+    }, {
+      sequelize,
+      tableName: 'prestadores',
+      // US09 - indice para o filtro de status da busca (pausado e suspenso saem)
+      indexes: [{ name: 'idx_prestadores_status', fields: ['status'] }]
+    });
   }
 
   static associate(models) {
     this.belongsTo(models.Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
     this.belongsToMany(models.Categoria, {
-      through: 'prestador_categorias', foreignKey: 'prestador_id',
-      otherKey: 'categoria_id', as: 'categorias', timestamps: false
+      through: { model: models.PrestadorCategoria, unique: false }, foreignKey: 'prestador_id',
+      otherKey: 'categoria_id', as: 'categorias'
     });
     this.belongsToMany(models.Bairro, {
-      through: 'prestador_bairros', foreignKey: 'prestador_id',
-      otherKey: 'bairro_id', as: 'bairros', timestamps: false
+      through: { model: models.PrestadorBairro, unique: false }, foreignKey: 'prestador_id',
+      otherKey: 'bairro_id', as: 'bairros'
     });
   }
 }

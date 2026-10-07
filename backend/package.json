@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "db:seed": "node src/database/seed.js",
+    "db:demo": "node src/database/demo.js",
     "teste": "node testes/criterios.js"
   },
   "dependencies": {

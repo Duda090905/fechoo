@@ -642,7 +642,7 @@ O build do frontend compila sem erros, e o fluxo completo foi percorrido no nave
 
 ### Arquivos
 
-- Backend novos: `models/Servico.js`, `models/Mensagem.js`, `models/PrestadorCategoria.js`, `models/PrestadorBairro.js`, `controllers/servicoController.js`, `servicos/metadados.js`, `servicos/lembretes.js`, `servicos/retencaoMidias.js`
+- Backend novos: `database/demo.js`, `models/Servico.js`, `models/Mensagem.js`, `models/PrestadorCategoria.js`, `models/PrestadorBairro.js`, `controllers/servicoController.js`, `servicos/metadados.js`, `servicos/lembretes.js`, `servicos/retencaoMidias.js`
 - Backend alterados: `models/Prestador.js`, `models/Categoria.js`, `models/Bairro.js`, `models/index.js`, `controllers/prestadorController.js`, `controllers/contaController.js`, `routes/index.js`, `middlewares/upload.js`, `servicos/armazenamento.js`, `utils/email.js`, `app.js`, `server.js`, `schema.sql`, `.env.example`, `testes/criterios.js`
 - Frontend novos: `paginas/Servicos.jsx`, `paginas/ServicoDetalhe.jsx`, `paginas/servicos.css`, `componentes/PedirOrcamento.jsx`, `componentes/pedir-orcamento.css`, `componentes/Chat.jsx`, `componentes/chat.css`, `componentes/ImagemProtegida.jsx`
 - Frontend alterados: `paginas/Prestadores.jsx`, `paginas/prestadores.css`, `paginas/MinhaConta.jsx`, `componentes/Cabecalho.jsx`, `componentes/Icones.jsx`, `servicos/api.js`, `utils/formatos.js`, `estilos/global.css`, `App.jsx`
@@ -656,11 +656,33 @@ O build do frontend compila sem erros, e o fluxo completo foi percorrido no nave
 5. Peça outro orçamento ao mesmo prestador no mesmo horário: é recusado (US13).
 6. Como contratante, veja o comprovante com valor, deslocamento e total separados e **recuse**: o pedido é encerrado e o chat fica só para leitura nas duas janelas (US10, US12).
 7. Em **Minha conta > Senha**, troque a senha (US26). A janela continua logada; uma sessão aberta antes em outro navegador volta para o login.
-8. Para mostrar a agenda, o selo e a nota antes das US11, US06 e US24, simule no banco:
-   ```sql
-   UPDATE servicos SET status = 'aceito' WHERE id = <id>;            -- agenda dos dois lados (US13)
-   UPDATE prestadores SET verificado = 1, nota_media = 4.8 WHERE id = <id>;  -- selo e nota (US09)
-   ```
+8. Para mostrar a agenda, o selo, a nota e o chat encerrado, use os dados de demonstração (`npm run db:demo`, seção abaixo).
+
+### Dependências entre histórias e a demonstração
+
+O INVEST (aula de User Stories) pede histórias independentes "sempre que possível". Três critérios desta sprint dependem de histórias que ficaram para depois:
+
+| Critério desta sprint | Depende de | Como foi tratado |
+|---|---|---|
+| US13: o compromisso aparece na agenda após o aceite | US11 (aceite) | Agenda pronta; o aceite é simulado |
+| US09: cartão com nota média e ordenação por avaliação | US24 (avaliação mútua) | Coluna `nota_media` lida e ordenada; a nota é simulada |
+| US09: cartão com selo | US06 (verificação) | Coluna `verificado` lida e exibida; o selo é simulado |
+| US12: o chat encerra após a conclusão | US20 (conclusão) | Encerramento pronto (também vale na recusa, que já existe); a conclusão é simulada |
+
+Nenhuma dessas histórias foi construída. A simulação grava direto no banco o **resultado** que elas produziriam, sem tela nem endpoint, como um stub de teste. Ela existe em dois lugares:
+
+- **Testes automáticos** (`npm run teste`): cada critério dependente tem a simulação marcada no código ("O aceite e a US11... simulado direto no banco").
+- **Dados de demonstração** (`npm run db:demo`, arquivo `src/database/demo.js`): contas e serviços prontos para a apresentação, cada dado simulado comentado com a história que o produziria. Senha de todas as contas: `demo1234`. As datas partem do dia em que o comando roda; para recriar no dia da apresentação, `npm run db:demo -- --recriar`.
+
+| Conta | O que mostra |
+|---|---|
+| `ana.demo@fecho.app` (contratante) | pedido esperando orçamento, orçamento para recusar ao vivo, compromisso amanhã na agenda, serviço concluído com o chat fechado |
+| `bruno.demo@fecho.app` (contratante) | compromisso com taxa de deslocamento na agenda |
+| `rita.demo@fecho.app` (prestadora) | selo e nota 4,8 na busca, 3 serviços concluídos, compromisso de amanhã na agenda |
+| `eli.demo@fecho.app` (prestador) | pedido esperando o orçamento dele, para responder ao vivo |
+| `joao.demo@fecho.app` (prestador) | sem nota e sem selo, para comparar na busca |
+
+Ao subir a API com esses dados, o lembrete da véspera do compromisso de amanhã aparece no console (US13).
 
 ### Em aberto
 

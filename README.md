@@ -14,7 +14,7 @@ Plataforma de contratação de serviços com pagamento retido. Este repositório
 
 Os cards coringa ganham o próximo número do backlog quando entram numa sprint: o CC06 virou a US26.
 
-**O que depende das próximas histórias.** O aceite do orçamento é a US11; por isso a agenda (US13) só mostra o compromisso depois de um aceite que ainda não existe na tela. A nota média e o selo do cartão da busca (US09) já são lidos do banco e ordenam o resultado, mas quem os preenche são a US24 (avaliações) e a US06 (verificação). Os testes automáticos simulam essas etapas direto no banco para provar os critérios.
+**O que depende das próximas histórias.** O aceite do orçamento é a US11; por isso a agenda (US13) só mostra o compromisso depois de um aceite que ainda não existe na tela. A nota média e o selo do cartão da busca (US09) já são lidos do banco e ordenam o resultado, mas quem os preenche são a US24 (avaliações) e a US06 (verificação). Os testes automáticos simulam essas etapas direto no banco para provar os critérios, e o `npm run db:demo` faz o mesmo para a apresentação (contas `*.demo@fecho.app`, senha `demo1234`; para recriar com datas novas, `npm run db:demo -- --recriar`).
 
 ### Sprint 1
 
@@ -51,6 +51,7 @@ cd backend
 npm install
 cp .env.example .env     # preencha DB_USER e DB_PASS
 npm run db:seed          # carrega áreas, categorias e bairros
+npm run db:demo          # (opcional) contas e serviços de demonstração do Sprint 2
 npm run dev              # http://localhost:3333
 ```
 

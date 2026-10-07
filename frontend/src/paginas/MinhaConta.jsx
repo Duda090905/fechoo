@@ -8,6 +8,66 @@ import Aviso from '../componentes/Aviso';
 import { formatarTelefone } from '../utils/formatos';
 import './painel.css';
 
+// US26 (curinga CC06) - trocar a senha estando logado. As outras sessões
+// são encerradas; esta continua, com o token novo que a API devolve.
+function TrocarSenha() {
+  const { autenticar } = useAuth();
+  const [aberto, setAberto] = useState(false);
+  const [atual, setAtual] = useState('');
+  const [nova, setNova] = useState('');
+  const [repetida, setRepetida] = useState('');
+  const [erro, setErro] = useState('');
+  const [mensagem, setMensagem] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  function fechar() {
+    setAberto(false); setAtual(''); setNova(''); setRepetida(''); setErro('');
+  }
+
+  async function salvar(evento) {
+    evento.preventDefault();
+    setErro(''); setMensagem('');
+    if (nova !== repetida) { setErro('As duas senhas novas precisam ser iguais.'); return; }
+    setEnviando(true);
+    try {
+      const dados = await api.trocarSenha({ senha_atual: atual, nova_senha: nova });
+      autenticar(dados.token, dados.usuario);
+      fechar();
+      setMensagem(dados.mensagem);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="cartao">
+      <h2>Senha</h2>
+      <Aviso tipo="sucesso">{mensagem}</Aviso>
+      {!aberto ? (
+        <>
+          <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+            Ao trocar, sua conta sai de todos os outros aparelhos em que estiver aberta. Neste aqui você continua dentro.
+          </p>
+          <Botao tipo="secundario" type="button" onClick={() => { setMensagem(''); setAberto(true); }}>Trocar senha</Botao>
+        </>
+      ) : (
+        <form onSubmit={salvar}>
+          <Aviso>{erro}</Aviso>
+          <Campo etiqueta="Senha atual" type="password" value={atual} onChange={(e) => setAtual(e.target.value)} autoComplete="current-password" required />
+          <Campo etiqueta="Nova senha" type="password" value={nova} onChange={(e) => setNova(e.target.value)} ajuda="Mínimo de 8 caracteres, com letra e número. Diferente da atual." autoComplete="new-password" required />
+          <Campo etiqueta="Repita a nova senha" type="password" value={repetida} onChange={(e) => setRepetida(e.target.value)} autoComplete="new-password" required />
+          <div className="empilha">
+            <Botao type="submit" carregando={enviando}>Salvar nova senha</Botao>
+            <Botao tipo="secundario" type="button" onClick={fechar}>Cancelar</Botao>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export default function MinhaConta() {
   const { usuario, atualizarUsuario, sair } = useAuth();
   const inativa = usuario?.status === 'inativo';
@@ -105,6 +165,8 @@ export default function MinhaConta() {
           </div>
         </div>
       </div>
+      {!inativa && <TrocarSenha />}
+
       {!inativa && (
         <div className="cartao cartao--perigo">
           <h2>Desativar minha conta</h2>

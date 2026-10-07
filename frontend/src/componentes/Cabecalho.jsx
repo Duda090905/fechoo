@@ -27,6 +27,7 @@ export default function Cabecalho() {
       <Link to="/prestadores" onClick={() => setAberto(false)}>Profissionais</Link>
       {usuario ? (
         <>
+          <Link to="/servicos" onClick={() => setAberto(false)}>Meus serviços</Link>
           {usuario.tipo_perfil === 'prestador' && (
             <Link to="/meu-perfil" onClick={() => setAberto(false)}>Meu perfil</Link>
           )}

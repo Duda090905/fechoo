@@ -1,0 +1,223 @@
+/* Meus serviços (US10/US13) e a página de um serviço (US10/US12/US13). */
+
+/* Abas --------------------------------------------------------------------- */
+.abas {
+  display: inline-flex; gap: 4px;
+  padding: 4px; margin-bottom: 26px;
+  background: var(--azul-claro);
+  border-radius: var(--raio-total);
+}
+.abas__item {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 0; background: transparent; cursor: pointer;
+  padding: 9px 20px; border-radius: var(--raio-total);
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 15px;
+  color: var(--azul-medio);
+}
+.abas__item--ativa { background: var(--azul-noite); color: #fff; }
+.abas__contagem {
+  min-width: 22px; height: 22px; padding: 0 6px;
+  display: inline-grid; place-items: center;
+  border-radius: var(--raio-total);
+  background: var(--amarelo); color: var(--azul-noite);
+  font-size: 12.5px;
+}
+
+/* Status: o nome de cada status é sempre o mesmo, em todas as telas. */
+.status {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  padding: 4px 11px; border-radius: var(--raio-total);
+  font-size: 13px; font-weight: 500; line-height: 1.5;
+  background: var(--azul-claro); color: var(--azul-medio);
+}
+.status--orcamento_enviado { background: var(--amarelo-fraco); color: #7A5900; }
+.status--aceito, .status--em_execucao { background: var(--verde-fraco); color: #146B49; }
+.status--recusado, .status--cancelado, .status--expirado { background: #EEF1F6; color: var(--texto-suave); }
+.status--em_disputa { background: var(--vermelho-fraco); color: #9B2C2C; }
+
+/* Lista de pedidos --------------------------------------------------------- */
+.grupo { margin-bottom: 30px; }
+.grupo__titulo {
+  font-size: 16px; margin: 0 0 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.grupo__titulo span { color: var(--texto-claro); font-weight: 500; }
+.grupo__lista {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-grande);
+  overflow: hidden;
+}
+
+.pedido {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 18px;
+  color: inherit; text-decoration: none;
+  border-bottom: 1px solid var(--borda);
+  transition: background-color .15s ease;
+}
+.pedido:last-child { border-bottom: 0; }
+.pedido:hover { background: #FAFBFC; }
+.pedido .status { margin-left: auto; }
+
+/* Folha de calendário: a data do atendimento é o que se procura primeiro. */
+.folha {
+  flex: 0 0 52px;
+  display: flex; flex-direction: column; align-items: center;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+}
+.folha__mes {
+  width: 100%; text-align: center;
+  background: var(--azul-noite); color: #fff;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .04em; line-height: 1.7;
+}
+.folha__dia {
+  font-family: var(--fonte-titulo); font-weight: 700; font-size: 21px; line-height: 1.45;
+}
+
+.pedido__texto, .compromisso__texto { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.pedido__quem { font-family: var(--fonte-titulo); font-weight: 600; font-size: 16px; }
+.pedido__descricao {
+  color: var(--texto-suave); font-size: 14.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pedido__meta { font-size: 13.5px; color: var(--texto-claro); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.pedido__bairro { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; color: var(--texto-claro); }
+
+/* Agenda ------------------------------------------------------------------- */
+.agenda__dia { margin-bottom: 26px; }
+.agenda__titulo { font-size: 16px; margin: 0 0 12px; }
+.agenda__titulo::first-letter { text-transform: uppercase; }
+.agenda__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.compromisso {
+  display: flex; gap: 18px; align-items: stretch;
+  padding: 16px 18px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-left: 4px solid var(--azul-noite);
+  border-radius: var(--raio);
+  color: inherit; text-decoration: none;
+}
+.compromisso:hover { border-color: #C9D4E4; border-left-color: var(--azul-noite); }
+.compromisso__hora {
+  flex: 0 0 76px;
+  font-family: var(--fonte-titulo); font-weight: 700; font-size: 19px; line-height: 1.2;
+}
+.compromisso__hora span { display: block; font-family: var(--fonte-texto); font-weight: 400; font-size: 13px; color: var(--texto-claro); }
+
+/* Vazio -------------------------------------------------------------------- */
+.nada-servicos {
+  text-align: center;
+  padding: 52px 24px;
+  background: var(--superficie);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio-grande);
+}
+.nada-servicos__icone {
+  width: 56px; height: 56px; margin: 0 auto 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--azul-claro); color: var(--azul-medio);
+}
+.nada-servicos h3 { font-size: 18px; margin: 0 0 6px; }
+.nada-servicos p { color: var(--texto-suave); margin: 0 auto 20px; font-size: 15px; max-width: 48ch; }
+.nada-servicos .botao { display: inline-block; text-decoration: none; }
+
+/* Página do serviço -------------------------------------------------------- */
+.pagina.pagina--servico { max-width: 1080px; }
+.servico-topo { padding: clamp(22px, 3vw, 32px) 0 20px; }
+.voltar {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--texto-suave); text-decoration: none; font-size: 14.5px;
+  margin-bottom: 10px;
+}
+.voltar:hover { color: var(--texto); }
+.servico-topo__titulo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.servico-topo__titulo h1 { font-size: clamp(24px, 3vw, 30px); margin: 0; }
+
+.servico-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: 20px;
+  align-items: start;
+}
+.servico-grade__principal .cartao h2 { margin-bottom: 12px; }
+
+.pedido-texto { font-size: 16px; white-space: pre-line; margin-bottom: 16px; }
+.pedido-dados { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pedido-dados li { display: flex; gap: 9px; align-items: center; color: var(--texto-suave); font-size: 15px; }
+.pedido-dados li > svg { flex: 0 0 18px; color: var(--azul-medio); }
+.pedido-dados .etiqueta { margin-left: 8px; }
+.pedido-fotos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+.pedido-fotos .imagem-protegida, .pedido-fotos__imagem { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--raio); display: block; }
+.pedido-nota { color: var(--texto-suave); font-size: 14.5px; margin: 14px 0 0; }
+
+.imagem-protegida__botao { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; width: 100%; }
+.imagem-protegida--carregando, .imagem-protegida--vazia {
+  display: grid; place-items: center;
+  background: var(--fundo); color: var(--texto-claro); font-size: 12.5px; text-align: center;
+  min-height: 80px;
+}
+
+/* Espera do orçamento: três pontos que pulsam devagar. */
+.espera { display: flex; gap: 14px; align-items: center; color: var(--texto-suave); }
+.espera p { margin: 0; font-size: 15px; }
+.espera__pontos { display: inline-flex; gap: 5px; flex: 0 0 auto; }
+.espera__pontos i {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--azul-medio);
+  animation: espera 1.4s ease-in-out infinite;
+}
+.espera__pontos i:nth-child(2) { animation-delay: .2s; }
+.espera__pontos i:nth-child(3) { animation-delay: .4s; }
+@keyframes espera { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+/* Comprovante do orçamento. */
+.comprovante {
+  position: relative;
+  background: var(--fundo);
+  border-radius: var(--raio);
+  padding: 18px 20px;
+}
+.comprovante dl { margin: 0; }
+.comprovante__linhas div, .comprovante__detalhes div {
+  display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 15px;
+}
+.comprovante dt { color: var(--texto-suave); }
+.comprovante dd { margin: 0; font-weight: 500; text-align: right; }
+.comprovante__total {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  margin: 10px 0; padding: 14px 0 12px;
+  border-top: 2px dashed #C9D2DF; border-bottom: 2px dashed #C9D2DF;
+}
+.comprovante__total span { font-family: var(--fonte-titulo); font-weight: 600; font-size: 16px; }
+.comprovante__total strong { font-family: var(--fonte-titulo); font-size: 30px; font-weight: 700; color: var(--verde); letter-spacing: -.02em; }
+.comprovante__detalhes div { font-size: 14px; }
+.comprovante__nota { margin: 10px 0 0; font-size: 13.5px; color: var(--texto-suave); }
+.comprovante--recusado { opacity: .62; }
+.comprovante--recusado .comprovante__total strong { color: var(--texto-suave); text-decoration: line-through; }
+
+.duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.previsao {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 14px 16px; margin-bottom: 18px;
+  background: var(--fundo); border-radius: var(--raio);
+  color: var(--texto-suave); font-size: 15px;
+}
+.previsao strong { font-family: var(--fonte-titulo); font-size: 22px; color: var(--verde); }
+
+.recusar { margin-top: 16px; }
+.confirmar { margin-top: 16px; padding: 16px; border-radius: var(--raio); background: var(--vermelho-fraco); }
+.confirmar p { color: #9B2C2C; font-size: 15px; }
+
+/* Responsivo --------------------------------------------------------------- */
+@media (max-width: 920px) {
+  .servico-grade { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .pedido { flex-wrap: wrap; gap: 12px 14px; }
+  .pedido__texto { flex: 1 1 calc(100% - 70px); }
+  .pedido .status { margin-left: 66px; }
+  .duas-colunas { grid-template-columns: 1fr; }
+}

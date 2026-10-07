@@ -1,6 +1,22 @@
-# Fechô — Sprint 1
+# Fechô — Sprint 2
 
-Plataforma de contratação de serviços com pagamento retido. Este repositório cobre o **Sprint 1: identidade, perfil e listagem** — 25 pontos.
+Plataforma de contratação de serviços com pagamento retido. Este repositório cobre o **Sprint 1** (identidade, perfil e listagem, 25 pontos) e o **Sprint 2** (encontrar e combinar o serviço).
+
+### Sprint 2
+
+| Nº | História | Origem |
+|---|---|---|
+| US09 | Busca por categoria e bairro | backlog |
+| US10 | Solicitação de serviço e orçamento | backlog |
+| US12 | Chat interno do serviço | backlog |
+| US13 | Agendamento de data e hora | backlog |
+| US26 | Alterar a senha estando logado | curinga CC06 |
+
+Os cards coringa ganham o próximo número do backlog quando entram numa sprint: o CC06 virou a US26.
+
+**O que depende das próximas histórias.** O aceite do orçamento é a US11; por isso a agenda (US13) só mostra o compromisso depois de um aceite que ainda não existe na tela. A nota média e o selo do cartão da busca (US09) já são lidos do banco e ordenam o resultado, mas quem os preenche são a US24 (avaliações) e a US06 (verificação). Os testes automáticos simulam essas etapas direto no banco para provar os critérios.
+
+### Sprint 1
 
 | Nº | História | Nota |
 |---|---|---|
@@ -11,8 +27,6 @@ Plataforma de contratação de serviços com pagamento retido. Este repositório
 | US05 | Perfil do prestador | 8 |
 | US07 | Pausar perfil | 1 |
 | US08 | Filtro de atendimento entre mulheres | 2 |
-
-Junto foi construída uma **listagem simples de prestadores**, sem a qual as US05, US07 e US08 não teriam como ser demonstradas. Ela só mostra quem tem perfil completo e está ativo, e tem apenas o filtro "apenas mulheres"; a busca por categoria e bairro é a US09, do próximo sprint.
 
 ---
 
@@ -27,6 +41,8 @@ CREATE DATABASE fecho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 As tabelas são criadas pela própria aplicação ao iniciar. O arquivo `backend/schema.sql` existe como referência do modelo, caso prefira criar na mão.
+
+**Banco que já existia no Sprint 1:** as tabelas novas (`servicos` e `mensagens`) são criadas sozinhas, mas as colunas e os índices novos precisam do SQL que está em `ALTERACOES.md`, seção *Sprint 2 > Banco de dados*.
 
 ### 2. API
 
@@ -54,7 +70,7 @@ cd backend
 npm run teste
 ```
 
-Sobe a API em um banco em memória e verifica os critérios de aceite do sprint, história por história. Não precisa do MySQL rodando. É o jeito mais rápido de demonstrar o sprint na apresentação.
+Sobe a API em um banco em memória e verifica os critérios de aceite dos dois sprints, história por história (192 verificações). Não precisa do MySQL rodando. É o jeito mais rápido de demonstrar o sprint na apresentação.
 
 ---
 
@@ -78,13 +94,25 @@ Sobe a API em um banco em memória e verifica os critérios de aceite do sprint,
 | PUT | `/api/prestadores/foto` | US05 (enviar foto) | sim (prestador) |
 | DELETE | `/api/prestadores/foto` | US05 (remover foto) | sim (prestador) |
 | PATCH | `/api/prestadores/pausa` | US07 | sim (prestador) |
-| GET | `/api/prestadores` | US05, US07, US08 (listagem simples) | não |
+| PUT | `/api/conta/senha` | US26 (trocar a senha logado) | sim |
+| GET | `/api/prestadores?categoria=&bairro=&somente_mulheres=` | US09 (busca), US07, US08 | não |
+| POST | `/api/servicos` | US10, US13 (pedido com fotos, data e hora) | sim (contratante) |
+| GET | `/api/servicos` | US10 (meus pedidos e pendências do prestador) | sim |
+| GET | `/api/servicos/agenda` | US13 (compromissos depois do aceite) | sim |
+| GET | `/api/servicos/:id` | US10, US02 (só as duas partes) | sim |
+| POST | `/api/servicos/:id/orcamento` | US10, US13 (valor, prazo, horário, deslocamento) | sim (prestador) |
+| POST | `/api/servicos/:id/recusar` | US10 (recusar e encerrar) | sim (contratante) |
+| GET | `/api/servicos/:id/arquivos/:nome` | US10, US12 (fotos e imagens, só as partes) | sim |
+| GET | `/api/servicos/:id/mensagens?depois=` | US12 | sim |
+| POST | `/api/servicos/:id/mensagens` | US12 (texto e imagem) | sim |
 
 ---
 
 ## Front-end
 
-A home é enxuta e só fala do que o sistema faz neste sprint: capa com os dois caminhos (contratar ou oferecer serviço), as categorias vindas da API e um resumo para cada público. Pagamento retido, orçamento e avaliação entram na home quando forem entregues.
+Telas do Sprint 2: **Profissionais** (a busca, escrita como uma frase: "Preciso de [serviço] no bairro [bairro]"), o painel **Pedir orçamento** que abre por cima da busca, **Meus serviços** (abas Pedidos e Agenda) e a página de cada serviço, com o pedido, o orçamento em forma de comprovante e a conversa. A troca de senha fica em **Minha conta**.
+
+A home é enxuta e só fala do que o sistema faz: capa com os dois caminhos (contratar ou oferecer serviço), as categorias vindas da API e um resumo para cada público. Pagamento retido, orçamento e avaliação entram na home quando forem entregues.
 
 As telas de conta (entrar, criar conta, recuperar senha) usam layout de duas colunas no desktop, com uma lateral escura que resume o que a plataforma oferece; no celular a lateral some e sobra só o formulário.
 
@@ -133,6 +161,20 @@ A anonimização mantém o registro da conta (para o que a lei exige guardar, co
 
 **Filtro entre mulheres (US08).** O campo de sexo é opcional no cadastro. A opção "atendo apenas mulheres" é da prestadora, nunca vem marcada por padrão, e o back-end recusa quem não se identificou como mulher. Quem não informou o sexo simplesmente não aparece quando o filtro está ligado. A finalidade é a segurança pessoal de quem recebe alguém em casa, não segmentação comercial.
 
+**Busca (US09).** Filtros opcionais de categoria e bairro, somados ao filtro entre mulheres. Só aparece prestador ativo, com conta ativa e com categoria e bairro. A ordem é: avaliação média (quem não tem nota vai para o fim), depois serviços concluídos (status confirmado ou pago), depois ordem de cadastro. Os campos de filtro têm índice (`idx_prestador_categorias_categoria`, `idx_prestador_bairros_bairro`, `idx_prestadores_status`).
+
+**Pedido e orçamento (US10).** Os status seguem os nomes do cartão: `aguardando_orcamento`, `orcamento_enviado` e `recusado`. A coluna já tem os demais estados da máquina de estados, para as próximas histórias. O prazo do orçamento é a duração estimada em horas (1 a 24). Taxa de deslocamento só quando o bairro do pedido está fora dos bairros do prestador (pode ser zero); dentro da área, é recusada. Quem atende apenas mulheres (US08) não recebe pedido de quem não se identificou como mulher.
+
+**Fotos do pedido e imagens do chat (US10, US12).** Até 3 fotos por pedido e 1 imagem por mensagem, JPG, PNG ou WebP de até 2 MB, conferidas pelo conteúdo. A localização gravada pelo celular (EXIF/XMP) é apagada antes de salvar, porque revelaria o endereço do contratante antes do aceite. Os arquivos ficam em `uploads/servicos`, que não é pasta pública: só as duas partes abrem, pela rota com login.
+
+**Agenda (US13).** Data e hora no pedido e na proposta; data no passado é recusada. Um horário fica ocupado pelo orçamento enviado e pelo compromisso aceito, do início até o fim do prazo. O compromisso aparece na agenda dos dois lados depois do aceite. Uma rotina de hora em hora manda o lembrete da véspera às duas partes (sem SMTP, aparece no console).
+
+**Chat (US12).** Só as duas partes abrem; para qualquer outra pessoa a resposta é 404, sem revelar que o serviço existe. Não existe edição nem exclusão de mensagem. O chat para de receber mensagens quando o serviço é concluído ou encerrado (recusado, cancelado, expirado), e as mensagens continuam disponíveis para consulta. O front busca as novas a cada 3 segundos.
+
+**Prazo de guarda das mídias (US12).** Imagens do chat e fotos do pedido ficam 90 dias depois do encerramento do serviço (`MIDIAS_RETENCAO_DIAS`). O prazo cobre a disputa (aberta em até 72 horas e decidida em até 7 dias) e o pedido de devolução de um Pix (MED), que pode ser feito em até 80 dias. Depois disso os arquivos saem do disco; o texto das mensagens fica.
+
+**Trocar a senha (US26).** Exige a senha atual e aplica a mesma regra do cadastro; a nova não pode ser igual à atual. Sobe o `token_versao`, o que encerra as outras sessões, e devolve um token novo para a sessão que fez a troca.
+
 **Cores.** Azul-noite `#14243D` como base, amarelo `#FFC93C` apenas na ação principal de cada tela. Amarelo com texto azul-noite passa no contraste mínimo da WCAG; amarelo como cor de texto, não. Verde e vermelho ficam reservados para dinheiro e problema, e não decoram nada.
 
 ---
@@ -142,4 +184,7 @@ A anonimização mantém o registro da conta (para o que a lei exige guardar, co
 1. **As 17 categorias em `backend/src/database/seed.js` são uma proposta.** Trocar pelos nomes exatos definidos no escopo do grupo e rodar `npm run db:seed` de novo.
 2. **A lista de bairros** tem 25 bairros de Campinas, também para substituir pela lista oficial de vocês.
 3. **Retenção de conta inativa.** Implementada com 12 meses e aviso 30 dias antes (recomendação do grupo). Confirmar o prazo com o cliente e escrevê-lo nos termos de uso.
-4. **Fotos em disco.** Servem para desenvolvimento e apresentação; em hospedagem real, usar armazenamento externo.5. **Migrations.** O projeto usa `sequelize.sync()`, que resolve em desenvolvimento. Para produção o certo é migração versionada.
+4. **Fotos em disco.** Servem para desenvolvimento e apresentação; em hospedagem real, usar armazenamento externo.
+5. **Migrations.** O projeto usa `sequelize.sync()`, que resolve em desenvolvimento. Para produção o certo é migração versionada.
+6. **Aceite, avaliações e verificação.** A agenda depende do aceite (US11), e a nota média e o selo da busca dependem da US24 e da US06.
+7. **Prazo de guarda das mídias do chat (90 dias).** Proposta técnica a confirmar pelo grupo.

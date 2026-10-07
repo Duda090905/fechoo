@@ -1,6 +1,6 @@
 # Registro de alterações
 
-Branch: `Alterações-(correções-sprint-1)`
+Branches: `Alterações-(correções-sprint-1)` (Sprint 1) e `Sprint-2` (seção [Sprint 2](#sprint-2-us09-us10-us12-us13-e-us26) no fim deste arquivo).
 
 Este arquivo lista o que foi mudado em cada etapa, por quê, e como conferir.
 A numeração dos itens segue a lista combinada na análise do Sprint 1.
@@ -14,6 +14,7 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | 4. Prioridade média (revisada) | 7, 8, 11, `schema.sql` e home enxuta | Concluída |
 | Retenção de conta inativa (US04) | 12 meses, aviso 30 dias antes | Concluída |
 | 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
+| Sprint 2 | US09, US10, US12, US13 e US26 (curinga CC06) | Concluída |
 
 ---
 
@@ -506,3 +507,163 @@ O build do frontend compila sem erros.
 - A rotina só roda enquanto a API está no ar. Em hospedagem real, vale um agendador externo (cron) chamando a mesma função.
 - Não há registro de acesso (log) além do último login; o art. 15 do Marco Civil (6 meses de registros de acesso) não pesa hoje, mas deve ser revisto se a plataforma passar a guardar logs.
 - O prazo e o comportamento (anonimizar, e não apagar tudo) continuam sendo uma recomendação até o cliente confirmar.
+
+---
+
+## Sprint 2: US09, US10, US12, US13 e US26
+
+Branch: `Sprint-2`. Cards definidos com o professor: US09, US10, US12, US13 e o curinga CC06, que entrou como **US26** (o curinga recebe o próximo número do backlog quando entra numa sprint).
+
+Regra seguida: cada tarefa do "O que será feito" e cada critério de aceite dos cinco cartões tem código e teste; nada que nenhum cartão pede foi construído. As tabelas abaixo ligam cada linha do cartão ao arquivo e ao teste.
+
+### US09 - Busca por categoria e bairro
+
+| No cartão | Onde está |
+|---|---|
+| Endpoint GET /api/prestadores com filtro por categoria e bairro | `prestadorController.listar` (parâmetros `categoria` e `bairro`; `somente_mulheres` da US08 continua) |
+| Ordenar por avaliação média e número de serviços concluídos | `ordenarParaBusca`: nota média (sem nota vai para o fim), depois concluídos (status `confirmado` ou `pago`), depois ordem de cadastro |
+| Tela de listagem com cartão (nome, nota média, serviços concluídos, selo) | `Prestadores.jsx` |
+| Índice no banco para os campos de filtro | `idx_prestador_categorias_categoria`, `idx_prestador_bairros_bairro`, `idx_prestadores_status` (modelos `PrestadorCategoria`, `PrestadorBairro`, `Prestador`) |
+
+| Critério de aceite | Teste (`npm run teste`, seção US09) |
+|---|---|
+| Retorna apenas prestadores da categoria e do bairro escolhidos | "a busca por categoria...", "a busca por bairro...", "categoria e bairro juntos..." |
+| Busca sem resultado exibe mensagem orientando o usuário | API: "busca sem resultado responde lista vazia"; tela: mensagem diz quem não foi encontrado e oferece procurar em todos os bairros |
+| Prestador pausado ou suspenso não aparece | "prestador pausado nao aparece", "prestador suspenso nao aparece" |
+
+**Nota média e selo.** O cartão pede os dois, mas quem os produz são outras histórias. Foram criadas as colunas `prestadores.nota_media` (a US24 grava a média) e `prestadores.verificado` (a US06 marca). A busca já lê, ordena e exibe; até essas histórias entrarem, todo mundo aparece "Sem avaliações ainda" e sem o selo. Os testes gravam valores direto no banco para provar a ordenação e o selo.
+
+### US10 - Solicitação de serviço e orçamento
+
+| No cartão | Onde está |
+|---|---|
+| Tabela Servicos (id, id_contratante, id_prestador, descricao, valor, taxa_deslocamento, status, datas) | `models/Servico.js` (mais `bairro_id`, `fotos`, `prazo_horas` e as datas da US13) |
+| POST /api/servicos com envio de fotos | `servicoController.criar` + `receberFotosPedido` (até 3 fotos) |
+| Tela do prestador para responder valor, prazo e taxa de deslocamento quando fora da área | `ServicoDetalhe.jsx` (`FormularioOrcamento`) e `POST /api/servicos/:id/orcamento` |
+| Controlar os status Aguardando orçamento, Orçamento enviado e Recusado | `aguardando_orcamento`, `orcamento_enviado`, `recusado` |
+
+| Critério de aceite | Teste (seção US10) |
+|---|---|
+| A solicitação aparece na lista de pendências do prestador | "a solicitacao aparece na lista de pendencias do prestador" (na tela: grupo "Esperando seu orçamento" e contador na aba) |
+| O orçamento chega ao contratante com valor, prazo e deslocamento separados | "o orcamento chega ao contratante com valor, prazo e deslocamento separados" |
+| Valor zerado ou negativo é recusado | "valor zerado ou negativo e recusado" |
+| O contratante consegue recusar e o serviço é encerrado | "o contratante consegue recusar e o servico e encerrado" |
+
+**Fotos do pedido.** Conferidas pelo conteúdo (JPG, PNG, WebP, 2 MB). A localização que o celular grava dentro da foto (EXIF/XMP, com GPS) é apagada antes de salvar (`servicos/metadados.js`): o contratante tira a foto em casa, e o arquivo original entregaria o endereço ao prestador antes do aceite. As fotos ficam em `uploads/servicos`, fora da pasta pública; só as duas partes abrem, por `GET /api/servicos/:id/arquivos/:nome`. Para isso a pasta pública passou a ser só `uploads/perfis` (`app.js`); o endereço das fotos de perfil não mudou.
+
+**US02, quarto critério.** "Usuário A não consegue acessar, pela URL, um serviço pertencente ao usuário B" dependia da tabela de serviços e agora está provado (seção US02 dos testes): quem não é parte recebe 404.
+
+### US13 - Agendamento de data e hora
+
+| No cartão | Onde está |
+|---|---|
+| Data e hora na solicitação e na proposta | `data_hora_solicitada` (contratante) e `data_hora_proposta` (orçamento) |
+| Agenda de compromissos no painel | `GET /api/servicos/agenda` e aba **Agenda** em Meus serviços (para os dois lados) |
+| Bloquear horário já ocupado pelo mesmo prestador | `horarioOcupado`: ocupam o orçamento enviado e o compromisso aceito, do horário até o fim do prazo |
+| Lembrete às duas partes na véspera | `servicos/lembretes.js`, de hora em hora, uma vez por serviço (sem SMTP, vai para o console) |
+
+| Critério de aceite | Teste (seção US13) |
+|---|---|
+| Não é possível agendar dois serviços no mesmo horário para o mesmo prestador | "nao e possivel agendar dois servicos no mesmo horario..." e "o prestador nao propoe horario que ja esta ocupado" |
+| Data no passado é recusada | "data no passado e recusada na solicitacao" e "...na proposta" |
+| O compromisso aparece na agenda dos dois lados após o aceite | "antes do aceite o compromisso nao esta na agenda" e "depois do aceite o compromisso aparece na agenda dos dois lados" |
+
+**Aceite.** O aceite do orçamento é a US11, que não está nesta sprint. O teste simula o aceite gravando o status `aceito` no banco. Na tela, a agenda fica vazia até a US11 existir.
+
+### US12 - Chat interno do serviço
+
+| No cartão | Onde está |
+|---|---|
+| Tabela Mensagens vinculada ao serviço | `models/Mensagem.js` |
+| Tela de conversa com envio de texto e imagem | `componentes/Chat.jsx` (na página do serviço), novas mensagens a cada 3 s |
+| Liberar o chat apenas para as duas partes | `carregarDaParte` no `servicoController` |
+| Definir prazo de retenção das mídias enviadas | 90 dias depois do encerramento do serviço (`MIDIAS_RETENCAO_DIAS`), aplicado por `servicos/retencaoMidias.js` |
+
+| Critério de aceite | Teste (seção US12) |
+|---|---|
+| Um terceiro usuário não consegue abrir o chat | "um terceiro usuario nao consegue abrir o chat daquele servico" (ler, escrever e abrir imagem) |
+| As mensagens ficam salvas e podem ser consultadas em caso de disputa | "as duas mensagens ficam salvas...", "nao existe forma de apagar mensagem", "depois de encerrado, as mensagens continuam disponiveis", "nenhuma mensagem e apagada pela rotina" |
+| O chat encerra o envio de novas mensagens após a conclusão | "o chat encerra o envio de novas mensagens apos a conclusao do servico" |
+
+**Por que 90 dias.** Cobre a disputa (aberta em até 72 horas depois da conclusão e decidida em até 7 dias) e o pedido de devolução de um Pix (MED), que pode ser feito em até 80 dias. Vencido o prazo, imagens do chat e fotos do pedido saem do disco; o texto fica, e o chat avisa que a imagem foi removida. **A confirmar pelo grupo.**
+
+**Encerramento.** O chat fecha em `concluido` e em todos os status depois dele, e também quando o serviço encerra sem acontecer (`recusado`, `cancelado`, `expirado`). A data fica em `encerrado_em`, marcada sozinha pelo modelo em qualquer mudança para esses status, então as próximas histórias não precisam lembrar disso.
+
+### US26 (curinga CC06) - Alterar a senha estando logado
+
+| No cartão | Onde está |
+|---|---|
+| PUT /api/conta/senha exigindo a senha atual e a nova | `contaController.trocarSenha` |
+| Mesma regra de força da criação de conta | `senhaForte` (a mesma do cadastro) |
+| Encerrar as outras sessões e devolver um token novo | sobe o `token_versao` (mecanismo da US03) e responde com `token` |
+| Tela de troca de senha em Minha conta | cartão **Senha** em `MinhaConta.jsx` |
+
+| Critério de aceite | Teste (seção US26) |
+|---|---|
+| Senha atual incorreta é recusada | "senha atual incorreta e recusada (sem derrubar a sessao)" |
+| Nova senha fraca ou igual à atual é recusada | "nova senha fraca e recusada", "nova senha igual a atual e recusada" |
+| Após a troca, a senha antiga não funciona e as outras sessões deixam de valer | "apos a troca, a senha antiga nao funciona..." e "as outras sessoes deixam de valer" |
+| A sessão em que a troca foi feita continua ativa | "a sessao em que a troca foi feita continua ativa" |
+
+Senha atual errada responde **400**, e não 401: no front, 401 significa sessão encerrada e levaria a pessoa de volta ao login.
+
+### Decisões tomadas onde o cartão não dizia (confirmar com o grupo)
+
+| Decisão | Por quê |
+|---|---|
+| Status da US10 com os nomes do cartão, não os da máquina de estados ("Solicitado", "Proposta enviada") | É o cartão que o professor confere. Os demais estados da máquina foram mantidos com os nomes dela |
+| Prazo do orçamento = duração estimada em horas, de 1 a 24 | É o que permite saber até quando o horário do prestador fica ocupado (US13) |
+| Até 3 fotos por pedido | O cartão pede fotos sem dizer quantas |
+| Um horário fica ocupado pelo orçamento enviado, não pelo pedido | Só o prestador ocupa a própria agenda; um pedido sozinho não bloqueia ninguém |
+| Quem atende apenas mulheres não recebe pedido de homem | Sem isso, a escolha da US08 deixava de valer no pedido |
+| Mídias guardadas por 90 dias depois do encerramento | Ver US12 |
+
+### Banco de dados
+
+`servicos` e `mensagens` são criadas sozinhas pelo `sequelize.sync()`. Num banco que já existia no Sprint 1, rode uma vez:
+
+```sql
+ALTER TABLE prestadores
+  ADD COLUMN nota_media DECIMAL(3,2) NULL AFTER atende_apenas_mulheres,
+  ADD COLUMN verificado TINYINT(1) NOT NULL DEFAULT 0 AFTER nota_media;
+CREATE INDEX idx_prestador_categorias_categoria ON prestador_categorias (categoria_id, prestador_id);
+CREATE INDEX idx_prestador_bairros_bairro ON prestador_bairros (bairro_id, prestador_id);
+-- Se o banco foi criado pelo schema.sql, este indice ja existe e o comando abaixo da erro de nome duplicado: pode ignorar.
+CREATE INDEX idx_prestadores_status ON prestadores (status);
+```
+
+Conferido num MySQL 8: um banco do Sprint 1 com esse SQL fica idêntico a um banco criado do zero pelo Sprint 2. O `schema.sql` foi atualizado e validado rodando o script inteiro.
+
+### Testes
+
+`npm run teste`: **192 critérios, 0 falhas** (eram 107). São 85 novos: 14 da US09, 30 da US10 (pedido, fotos e orçamento), 3 da US02, 14 da US13, 16 da US12 e 8 da US26. A suíte também passa inteira contra MySQL 8. Antes de entregar, regras importantes foram desligadas uma de cada vez (bloqueio de horário, fechamento do chat, checagem de quem é parte, remoção do GPS, encerramento das sessões), e o teste correspondente falhou em todos os casos.
+
+O build do frontend compila sem erros, e o fluxo completo foi percorrido no navegador.
+
+### Arquivos
+
+- Backend novos: `models/Servico.js`, `models/Mensagem.js`, `models/PrestadorCategoria.js`, `models/PrestadorBairro.js`, `controllers/servicoController.js`, `servicos/metadados.js`, `servicos/lembretes.js`, `servicos/retencaoMidias.js`
+- Backend alterados: `models/Prestador.js`, `models/Categoria.js`, `models/Bairro.js`, `models/index.js`, `controllers/prestadorController.js`, `controllers/contaController.js`, `routes/index.js`, `middlewares/upload.js`, `servicos/armazenamento.js`, `utils/email.js`, `app.js`, `server.js`, `schema.sql`, `.env.example`, `testes/criterios.js`
+- Frontend novos: `paginas/Servicos.jsx`, `paginas/ServicoDetalhe.jsx`, `paginas/servicos.css`, `componentes/PedirOrcamento.jsx`, `componentes/pedir-orcamento.css`, `componentes/Chat.jsx`, `componentes/chat.css`, `componentes/ImagemProtegida.jsx`
+- Frontend alterados: `paginas/Prestadores.jsx`, `paginas/prestadores.css`, `paginas/MinhaConta.jsx`, `componentes/Cabecalho.jsx`, `componentes/Icones.jsx`, `servicos/api.js`, `utils/formatos.js`, `estilos/global.css`, `App.jsx`
+
+### Como conferir à mão
+
+1. Entre como **prestador** e complete o perfil (categoria e bairro).
+2. Em outra janela anônima, entre como **contratante**, vá em **Profissionais** e monte a frase "Preciso de [serviço] no bairro [bairro]" (US09). Escolha um bairro sem ninguém para ver a mensagem que orienta.
+3. Clique em **Pedir orçamento**, escreva o pedido, escolha bairro, dia e hora e anexe uma foto (US10, US13). Tente uma data passada: é recusada.
+4. Na janela do prestador, **Meus serviços** mostra o pedido em "Esperando seu orçamento". Abra, converse pelo chat (texto e imagem) e envie o orçamento (US10, US12). Peça num bairro que o prestador não atende para ver o campo de taxa de deslocamento.
+5. Peça outro orçamento ao mesmo prestador no mesmo horário: é recusado (US13).
+6. Como contratante, veja o comprovante com valor, deslocamento e total separados e **recuse**: o pedido é encerrado e o chat fica só para leitura nas duas janelas (US10, US12).
+7. Em **Minha conta > Senha**, troque a senha (US26). A janela continua logada; uma sessão aberta antes em outro navegador volta para o login.
+8. Para mostrar a agenda, o selo e a nota antes das US11, US06 e US24, simule no banco:
+   ```sql
+   UPDATE servicos SET status = 'aceito' WHERE id = <id>;            -- agenda dos dois lados (US13)
+   UPDATE prestadores SET verificado = 1, nota_media = 4.8 WHERE id = <id>;  -- selo e nota (US09)
+   ```
+
+### Em aberto
+
+- **Nota dos cards no Planning Poker:** este arquivo não traz as notas do Sprint 2; registrar quando o grupo votar.
+- **Word das histórias:** criar o cartão US26 (texto do CC06) e marcar o CC06 como usado no documento dos curingas.
+- **Máquina de estados x US10:** decidir se os três primeiros status ficam com os nomes do cartão (como está) ou com os da máquina.

@@ -1,6 +1,6 @@
 # Registro de alterações
 
-Branches: `Alterações-(correções-sprint-1)` (Sprint 1) e `Sprint-2` (seção [Sprint 2](#sprint-2-us09-us10-us12-us13-e-us26) no fim deste arquivo).
+Branches: `Alterações-(correções-sprint-1)` (Sprint 1), `Sprint-2` (seção [Sprint 2](#sprint-2-us09-us10-us12-us13-e-us26)) e `Sprint-3` (seção [Sprint 3](#sprint-3-us06-us11-us17-e-us18), no fim deste arquivo).
 
 Este arquivo lista o que foi mudado em cada etapa, por quê, e como conferir.
 A numeração dos itens segue a lista combinada na análise do Sprint 1.
@@ -15,6 +15,7 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | Retenção de conta inativa (US04) | 12 meses, aviso 30 dias antes | Concluída |
 | 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
 | Sprint 2 | US09, US10, US12, US13 e US26 (curinga CC06) | Concluída |
+| Sprint 3 | US06, US11, US17 e US18 | Concluída |
 
 ---
 
@@ -689,3 +690,54 @@ Ao subir a API com esses dados, o lembrete da véspera do compromisso de amanhã
 - **Nota dos cards no Planning Poker:** este arquivo não traz as notas do Sprint 2; registrar quando o grupo votar.
 - **Word das histórias:** criar o cartão US26 (texto do CC06) e marcar o CC06 como usado no documento dos curingas.
 - **Máquina de estados x US10:** decidir se os três primeiros status ficam com os nomes do cartão (como está) ou com os da máquina.
+
+---
+
+## Sprint 3: US06, US11, US17 e US18
+
+Branch `Sprint-3`, criada a partir da `Sprint-2`. Testes: `npm run teste` passa de 192 para **242** critérios, todos passando (os 50 novos ficam em `backend/testes/sprint3.js`).
+
+### Decisões tomadas para não travar (levar ao grupo)
+
+1. **O serviço vira Aceito quando o webhook confirma o Pix, não no clique.** A máquina de estados diz "Aceito (o dinheiro congela)", e a US11 libera o endereço no Aceito. No clique, o serviço continua em *Orçamento enviado* com o pagamento *Aguardando*. Resolve a incoerência 3 (que estava em aberto).
+2. **No webhook, o serviço vai para Aceito, não para Pago.** A US18 no Word manda ir para Pago; isso contraria a máquina de estados (Pago só depois da confirmação e do repasse, US20). Resolve a incoerência 2.
+3. **US06 aceita só chave Pix do tipo CPF.** Uma chave CPF só pode estar em conta do dono do CPF; então "chave = CPF do cadastro" prova a titularidade sem consulta paga. Outros tipos ficam para a produção (consulta ao Banco Central por serviço pago).
+4. **O endereço é informado no aceite**, não no pedido. A US11 precisa de um endereço e nenhuma tela anterior o pedia; pedir só no aceite expõe o dado o mínimo possível (LGPD). Fica em `servicos.endereco`.
+5. **Prazo para pagar o Pix: 30 minutos** (`PIX_EXPIRA_MINUTOS`). Não há número decidido; vencido, a cobrança é cancelada no Asaas (o QR dinâmico do Asaas, sozinho, valeria 12 meses).
+
+### Textos dos cards que precisam mudar no Word
+
+| Card | Hoje no Word | Como fica |
+|---|---|---|
+| US06 | Envio de documento, aprovação do administrador | **O que será feito:** cadastro da chave Pix no painel do prestador; conferência do titular da chave contra o CPF do cadastro; selo na busca e no perfil quando bate; nenhuma imagem de documento pedida ou guardada. **Critérios:** chave cujo titular não é o CPF do cadastro é recusada; o selo só aparece depois da conferência aprovada; nenhuma imagem de documento é enviada ou armazenada; o prestador recusado recebe o motivo e pode cadastrar outra chave. **Nota:** 3. |
+| US11 | "Criar endpoint de mudança de status do serviço para Aceito" | "Criar endpoint de aceite do orçamento, com o endereço do atendimento; o serviço passa para Aceito quando o pagamento é confirmado (US18)." |
+| US17 | "Cobrança expirada devolve o serviço ao status anterior" | "Cobrança expirada é cancelada e o serviço continua em Orçamento enviado, com o aceite liberado de novo." |
+| US18 | "Alterar o status do pagamento para Retido e o do serviço para Pago"; "assinatura inválida" | "...para Retido e o do serviço para Aceito"; "Requisição com token inválido (cabeçalho asaas-access-token) é rejeitada com erro de autorização." |
+
+### O que mudou
+
+**Banco** (criado sozinho ao subir a API; nada de SQL à mão):
+- Tabelas novas: `pagamentos` (status Aguardando, Retido, Liberado, Estornado; identificador único; id da cobrança no gateway; copia e cola; QR; prazo), `eventos_webhook` (id do evento único = idempotência), `acessos_endereco` (log da US11), `notificacoes` (um aviso por pessoa, serviço e tipo).
+- Colunas novas: `servicos.endereco`, `servicos.aceito_em`, `usuarios.asaas_cliente_id`, `prestadores.chave_pix_tipo`, `prestadores.chave_pix`, `prestadores.verificado_em`.
+- `backend/src/database/colunas.js`: ao subir, acrescenta as colunas que faltam nas tabelas que já existem. Não usa `sync({ alter: true })`, que duplica índice único a cada vez que roda.
+
+**Back-end**
+- `servicos/gateway/` — `asaas.js` (fetch do próprio Node, cabeçalho `access_token`, trava que recusa endereço que não seja de sandbox), `simulado.js` (gera um Pix copia e cola válido, com o valor no campo 54) e `index.js` (escolhe pelo `.env`).
+- `servicos/cobrancas.js` — gera a cobrança com o total do orçamento (serviço + deslocamento), encerra cobrança vencida (cancela no gateway), aplica o webhook numa transação só (evento + pagamento Retido + serviço Aceito + avisos). Pix pago depois do prazo vale e cancela o Pix novo do mesmo serviço; Pix pago depois de recusado não reabre nada (fica registrado para devolução).
+- `controllers/pagamentoController.js` — o webhook: compara o token em tempo constante; responde 200 até para aviso repetido ou ignorado (erro faria o Asaas reenviar e, depois de 15 falhas, pausar a fila).
+- `servicoController.aceitar` — exige endereço; clique repetido devolve o mesmo Pix. `detalhar` entrega o endereço só do Aceito em diante e grava o log; lista e agenda nunca entregam. `recusar` cancela o Pix em aberto.
+- `prestadorController.cadastrarChavePix` — US06. A chave aparece mascarada só no próprio perfil.
+- `utils/pix.js` — monta e lê o BR Code (CRC16 conferido contra o exemplo do Banco Central).
+- `scripts/pix-pagar.js` — `npm run pix:pagar -- <id>` (`--repetir`, `--token-errado`, `--local`).
+- `anonimizacao.js` — "Apagar meus dados" também apaga a chave Pix, o selo e o id do cliente no Asaas.
+- **US04 (commit separado):** serviço aceito e pagamento Retido passam a bloquear desativar e apagar a conta. É o critério que a US04 já pedia e que só agora tem como acontecer. Se o grupo preferir manter a sprint só com os 4 cards, basta reverter esse commit.
+
+**Front-end**: `componentes/PagamentoPix.jsx` (+ `pagamento.css`), mudanças em `ServicoDetalhe.jsx`, `Servicos.jsx` (avisos e "Pix esperando pagamento") e `MeuPerfil.jsx` (cartão Receber pelo Pix).
+
+**Demonstração** (`npm run db:demo -- --recriar`): orçamento do Eli para a Ana aceitar ao vivo (R$ 180 + R$ 20 de deslocamento), compromissos já pagos com endereço, Rita com a chave Pix conferida, Eli sem selo para cadastrar a chave ao vivo (o script imprime o CPF certo e um errado).
+
+### Como conferir
+
+1. `npm run teste` → 242 critérios, 0 falhas.
+2. `Checklist Sprint 3 Fechô.md`: cada linha do "O que será feito" e cada critério dos 4 cards, com o teste e o passo na tela.
+

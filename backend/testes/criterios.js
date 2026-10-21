@@ -1,5 +1,5 @@
 /**
- * Verificacao dos criterios de aceite do Sprint 1 e do Sprint 2.
+ * Verificacao dos criterios de aceite dos Sprints 1, 2 e 3.
  * Sobe a API em memoria (sqlite) e chama os endpoints de verdade.
  *
  * Rodar com: npm run teste
@@ -1138,6 +1138,12 @@ async function rodar() {
   const mesmaSessaoServicos = await chamar('/servicos', { token: troca.dados.token });
   checar('a sessao em que a troca foi feita continua ativa (com o token devolvido)',
     mesmaSessao.status === 200 && mesmaSessaoServicos.status === 200);
+
+  // =======================================================================
+  // SPRINT 3 - US06, US17, US18 e US11 (arquivo testes/sprint3.js)
+  // =======================================================================
+  const { testarSprint3 } = require('./sprint3');
+  await testarSprint3({ chamar, chamarForm, checar, capturarConsole, base, bairro, idsCategorias, terceiro: otto });
 
   servidor.close();
   await sequelize.close();

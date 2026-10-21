@@ -1,9 +1,15 @@
 const { Op } = require('sequelize');
-const { Servico, Mensagem, Prestador, Usuario, Bairro, Categoria } = require('../models');
+const {
+  Servico, Mensagem, Prestador, Usuario, Bairro, Categoria, Pagamento, AcessoEndereco
+} = require('../models');
 const {
   detectarTipo, salvarArquivoServico, removerArquivoServico, caminhoArquivoServico, urlPublica
 } = require('../servicos/armazenamento');
 const { semMetadados } = require('../servicos/metadados');
+const {
+  emAberto, encerrarSeVencida, pagamentoDoServico, gerarCobranca
+} = require('../servicos/cobrancas');
+const { GatewayErro } = require('../servicos/gateway');
 
 const LIMITE_DESCRICAO = 1000;
 const LIMITE_MENSAGEM = 1000;
@@ -11,6 +17,9 @@ const LIMITE_MENSAGEM = 1000;
 // E ele que diz quanto tempo o horario do prestador fica ocupado (US13).
 const PRAZO_MAXIMO_HORAS = 24;
 const VALOR_MAXIMO = 99999999.99; // cabe em DECIMAL(10,2)
+// US11 - rua, numero e complemento do atendimento.
+const ENDERECO_MINIMO = 5;
+const ENDERECO_MAXIMO = 200;
 const HORA_MS = 60 * 60 * 1000;
 
 // Leitura dos campos ------------------------------------------------------
@@ -106,7 +115,32 @@ function foraDaArea(servico) {
 
 // Resposta -----------------------------------------------------------------
 
-function montarServico(servico, papel) {
+// US17 - o pagamento do servico. O Pix (QR code e copia e cola) so vai para
+// o contratante, e so enquanto a cobranca pode ser paga.
+function montarPagamento(pagamento, papel, { comPix = false } = {}) {
+  if (!pagamento) return null;
+  const aberto = emAberto(pagamento);
+  return {
+    status: pagamento.status,
+    valor: emReais(pagamento.valor),
+    identificador: pagamento.identificador,
+    em_aberto: aberto,
+    expira_em: pagamento.expira_em,
+    expirado: !aberto && pagamento.status === 'aguardando',
+    retido_em: pagamento.retido_em,
+    pix: comPix && aberto && papel === 'contratante'
+      ? {
+        copia_cola: pagamento.pix_copia_cola,
+        qr_code: pagamento.pix_qr_code,
+        simulado: pagamento.gateway === 'simulado'
+      }
+      : undefined
+  };
+}
+
+// Opcoes: pagamento (o mais recente), comPix e comEndereco (so no detalhe,
+// que e onde o acesso ao endereco fica registrado).
+function montarServico(servico, papel, { pagamento, comPix = false, comEndereco = false } = {}) {
   const temOrcamento = servico.valor !== null && servico.valor !== undefined;
   const valor = emReais(servico.valor);
   const taxa = emReais(servico.taxa_deslocamento) || 0;
@@ -144,8 +178,26 @@ function montarServico(servico, papel) {
       : null,
     chat_aberto: servico.chatAberto(),
     encerrado_em: servico.encerrado_em,
-    criado_em: servico.createdAt
+    criado_em: servico.createdAt,
+    aceito_em: servico.aceito_em,
+    // US17 - status do pagamento (tabela propria)
+    pagamento: pagamento === undefined ? undefined : montarPagamento(pagamento, papel, { comPix }),
+    // US11 - o endereco so sai do aceite em diante. Antes disso, nem a chave
+    // aparece na resposta.
+    ...(comEndereco && servico.enderecoLiberado() && servico.endereco
+      ? { endereco: { logradouro: servico.endereco, bairro: servico.bairro ? servico.bairro.nome : null } }
+      : {})
   };
+}
+
+// Pagamento mais recente de cada servico da lista, numa consulta so.
+async function ultimosPagamentos(servicos) {
+  const ids = servicos.map((s) => s.id);
+  if (!ids.length) return new Map();
+  const pagamentos = await Pagamento.findAll({ where: { servico_id: ids }, order: [['id', 'ASC']] });
+  const mapa = new Map();
+  pagamentos.forEach((p) => mapa.set(p.servico_id, p));
+  return mapa;
 }
 
 function montarMensagem(mensagem, usuarioId, autor = mensagem.autor) {
@@ -280,7 +332,10 @@ async function listar(req, res, next) {
       include: [INCLUDE_CONTRATANTE, includePrestador(), INCLUDE_BAIRRO],
       order: [['id', 'DESC']]
     });
-    return res.json({ servicos: servicos.map((s) => montarServico(s, filtro.papel)) });
+    const pagamentos = await ultimosPagamentos(servicos);
+    return res.json({
+      servicos: servicos.map((s) => montarServico(s, filtro.papel, { pagamento: pagamentos.get(s.id) || null }))
+    });
   } catch (e) {
     return next(e);
   }
@@ -296,9 +351,10 @@ async function agenda(req, res, next) {
       where: { ...filtro.where, status: Servico.STATUS_COMPROMISSO },
       include: [INCLUDE_CONTRATANTE, includePrestador(), INCLUDE_BAIRRO]
     });
+    const pagamentos = await ultimosPagamentos(servicos);
     const compromissos = servicos
       .sort((a, b) => new Date(a.horarioCombinado()) - new Date(b.horarioCombinado()))
-      .map((s) => montarServico(s, filtro.papel));
+      .map((s) => montarServico(s, filtro.papel, { pagamento: pagamentos.get(s.id) || null }));
     return res.json({ compromissos });
   } catch (e) {
     return next(e);
@@ -309,7 +365,77 @@ async function detalhar(req, res, next) {
   try {
     const servico = await carregarDaParte(req, res);
     if (!servico) return undefined;
-    return res.json({ servico: montarServico(servico, servico.papel) });
+    const pagamento = await pagamentoDoServico(servico.id);
+
+    // US11 - o endereco so vem do aceite em diante, e cada entrega fica no log.
+    const liberado = servico.enderecoLiberado() && Boolean(servico.endereco);
+    if (liberado) {
+      await AcessoEndereco.create({
+        servico_id: servico.id, usuario_id: req.usuario.id, papel: servico.papel, ip: req.ip || null
+      });
+    }
+    return res.json({
+      servico: montarServico(servico, servico.papel, { pagamento, comPix: true, comEndereco: liberado })
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+/**
+ * US11 - o contratante aceita o orcamento informando o endereco do
+ * atendimento. US17 - o aceite gera a cobranca Pix com o valor exato do
+ * orcamento. O servico so vira Aceito quando o gateway confirmar o
+ * pagamento (US18); ate la o endereco nao sai para ninguem.
+ */
+async function aceitar(req, res, next) {
+  try {
+    const servico = await carregarDaParte(req, res);
+    if (!servico) return undefined;
+    if (servico.papel !== 'contratante') {
+      return res.status(403).json({ erro: 'Só quem fez o pedido pode aceitar o orçamento.' });
+    }
+    if (servico.status !== 'orcamento_enviado') {
+      return res.status(409).json({ erro: 'Este pedido não tem orçamento esperando o seu aceite.' });
+    }
+
+    // Clique repetido: devolve o mesmo Pix, sem gerar outra cobranca.
+    const atual = await pagamentoDoServico(servico.id);
+    if (emAberto(atual)) {
+      return res.json({ servico: montarServico(servico, 'contratante', { pagamento: atual, comPix: true }) });
+    }
+
+    const endereco = String(req.body.endereco || '').replace(/\s+/g, ' ').trim();
+    if (endereco.length < ENDERECO_MINIMO) {
+      return res.status(400).json({ erro: 'Informe a rua e o número onde o serviço vai ser feito.' });
+    }
+    if (endereco.length > ENDERECO_MAXIMO) {
+      return res.status(400).json({ erro: `O endereço pode ter no máximo ${ENDERECO_MAXIMO} caracteres.` });
+    }
+    if (new Date(servico.horarioCombinado()) <= new Date()) {
+      return res.status(409).json({
+        erro: 'O horário deste orçamento já passou. Faça um novo pedido com outra data.'
+      });
+    }
+
+    let pagamento;
+    try {
+      pagamento = await gerarCobranca(servico, req.usuario);
+    } catch (e) {
+      if (e instanceof GatewayErro) {
+        console.error('[pagamento] falha ao gerar a cobranca:', e.detalhe || e.message);
+        return res.status(502).json({ erro: e.message });
+      }
+      throw e;
+    }
+
+    // Guardado agora, entregue so quando o servico chegar em Aceito.
+    servico.endereco = endereco;
+    await servico.save();
+
+    return res.status(201).json({
+      servico: montarServico(servico, 'contratante', { pagamento, comPix: true })
+    });
   } catch (e) {
     return next(e);
   }
@@ -405,6 +531,13 @@ async function recusar(req, res, next) {
     }
     if (servico.status !== 'orcamento_enviado') {
       return res.status(409).json({ erro: 'Não há orçamento para recusar neste pedido.' });
+    }
+
+    // US17 - se havia um Pix esperando pagamento, ele e cancelado junto.
+    const pagamento = await pagamentoDoServico(servico.id);
+    if (emAberto(pagamento)) {
+      pagamento.expira_em = new Date();
+      await encerrarSeVencida(pagamento);
     }
 
     servico.status = 'recusado';
@@ -505,6 +638,6 @@ async function enviarMensagem(req, res, next) {
 }
 
 module.exports = {
-  criar, listar, agenda, detalhar, enviarOrcamento, recusar, arquivo, mensagens, enviarMensagem,
+  criar, listar, agenda, detalhar, aceitar, enviarOrcamento, recusar, arquivo, mensagens, enviarMensagem,
   PRAZO_MAXIMO_HORAS
 };

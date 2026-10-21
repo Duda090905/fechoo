@@ -16,9 +16,14 @@ class Prestador extends Model {
       // US09 - a busca ordena por esta nota e o cartao a exibe. Vazia ate
       // existirem avaliacoes: quem calcula e grava a media e a US24.
       nota_media: { type: DataTypes.DECIMAL(3, 2), allowNull: true },
-      // US09 - o cartao da busca exibe o selo. Quem verifica a identidade e
-      // marca o campo e a US06; ate la, ninguem tem o selo.
-      verificado: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
+      // US09 / US06 - selo de identidade verificada. So a US06 marca o campo:
+      // quando a chave Pix cadastrada esta no CPF da propria conta.
+      verificado: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      // US06 - chave Pix para receber (o repasse e a US20). No MVP so a chave
+      // do tipo CPF, a unica cujo titular da para conferir sem consulta externa.
+      chave_pix_tipo: { type: DataTypes.STRING(10), allowNull: true },
+      chave_pix: { type: DataTypes.STRING(77), allowNull: true },
+      verificado_em: { type: DataTypes.DATE, allowNull: true }
     }, {
       sequelize,
       tableName: 'prestadores',

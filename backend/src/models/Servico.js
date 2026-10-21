@@ -31,6 +31,12 @@ const STATUS_OCUPAM_HORARIO = ['orcamento_enviado', 'aceito', 'em_execucao'];
 // US09 - contam como servico concluido: confirmado pelo contratante ou pago.
 const STATUS_CONCLUIDOS = ['confirmado', 'pago'];
 
+// US11 - o endereco so sai na API do aceite em diante (o aceite acontece
+// quando o pagamento fica retido, US18). Antes disso, ninguem recebe.
+const STATUS_ENDERECO_LIBERADO = [
+  'aceito', 'em_execucao', 'concluido', 'confirmado', 'pago', 'em_disputa', 'resolvido'
+];
+
 // US10 - pedido de servico e orcamento. US13 - data e hora. US12 - o chat
 // fica preso ao servico.
 class Servico extends Model {
@@ -69,7 +75,13 @@ class Servico extends Model {
       encerrado_em: { type: DataTypes.DATE, allowNull: true },
       midias_removidas_em: { type: DataTypes.DATE, allowNull: true },
       // US13 - lembrete da vespera, enviado uma vez so.
-      lembrete_enviado_em: { type: DataTypes.DATE, allowNull: true }
+      lembrete_enviado_em: { type: DataTypes.DATE, allowNull: true },
+      // US11 - rua, numero e complemento (o bairro ja esta em bairro_id).
+      // Informado pelo contratante ao aceitar o orcamento; so e liberado ao
+      // prestador quando o servico chega em Aceito.
+      endereco: { type: DataTypes.STRING(200), allowNull: true },
+      // US11 / US18 - quando virou Aceito (o pagamento ficou retido).
+      aceito_em: { type: DataTypes.DATE, allowNull: true }
     }, {
       sequelize,
       tableName: 'servicos',
@@ -90,6 +102,7 @@ class Servico extends Model {
     this.belongsTo(models.Prestador, { foreignKey: 'id_prestador', as: 'prestador' });
     this.belongsTo(models.Bairro, { foreignKey: 'bairro_id', as: 'bairro' });
     this.hasMany(models.Mensagem, { foreignKey: 'servico_id', as: 'mensagens', onDelete: 'RESTRICT' });
+    this.hasMany(models.Pagamento, { foreignKey: 'servico_id', as: 'pagamentos', onDelete: 'RESTRICT' });
   }
 
   // US13 - horario que vale: o da proposta, quando ja existe.
@@ -100,6 +113,10 @@ class Servico extends Model {
   chatAberto() {
     return !STATUS_ENCERRADOS.includes(this.status);
   }
+
+  enderecoLiberado() {
+    return STATUS_ENDERECO_LIBERADO.includes(this.status);
+  }
 }
 
 Servico.STATUS = STATUS;
@@ -107,5 +124,6 @@ Servico.STATUS_ENCERRADOS = STATUS_ENCERRADOS;
 Servico.STATUS_COMPROMISSO = STATUS_COMPROMISSO;
 Servico.STATUS_OCUPAM_HORARIO = STATUS_OCUPAM_HORARIO;
 Servico.STATUS_CONCLUIDOS = STATUS_CONCLUIDOS;
+Servico.STATUS_ENDERECO_LIBERADO = STATUS_ENDERECO_LIBERADO;
 
 module.exports = Servico;

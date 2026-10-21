@@ -72,4 +72,22 @@ async function enviarLembreteServico(email, { horario, outraParte, descricao }) 
   return { simulado: false };
 }
 
-module.exports = { enviarLinkRecuperacao, enviarAvisoRetencao, enviarLembreteServico };
+// US11 / US18 - aviso de pagamento garantido (prestador) e de pagamento
+// confirmado (contratante). Vai sem endereco: ele so aparece no app, com log.
+async function enviarAvisoServico(email, { titulo, texto }) {
+  if (!transporte) {
+    console.log('\n[aviso] destinatario:', email);
+    console.log(`[aviso] ${titulo}: ${texto}\n`);
+    return { simulado: true };
+  }
+
+  await transporte.sendMail({
+    from: 'Fecho <nao-responda@fecho.app>',
+    to: email,
+    subject: `${titulo} - Fechô`,
+    text: `${texto}\n\nAbra o Fechô para ver os detalhes do pedido.`
+  });
+  return { simulado: false };
+}
+
+module.exports = { enviarLinkRecuperacao, enviarAvisoRetencao, enviarLembreteServico, enviarAvisoServico };

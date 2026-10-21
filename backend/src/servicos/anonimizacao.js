@@ -19,6 +19,11 @@ async function anonimizarConta(usuario) {
     prestador.status = 'suspenso';
     prestador.descricao = null;
     prestador.foto_url = null;
+    // US06 - a chave Pix (o CPF) e o selo saem junto com os dados pessoais.
+    prestador.chave_pix = null;
+    prestador.chave_pix_tipo = null;
+    prestador.verificado = false;
+    prestador.verificado_em = null;
     await prestador.save();
     await prestador.setCategorias([]);
     await prestador.setBairros([]);
@@ -31,6 +36,7 @@ async function anonimizarConta(usuario) {
   usuario.telefone = null;
   usuario.senha_hash = null;
   usuario.sexo = 'nao_informado';
+  usuario.asaas_cliente_id = null; // US17
   usuario.status = 'excluido';
   usuario.excluido_em = new Date();
   await usuario.save();

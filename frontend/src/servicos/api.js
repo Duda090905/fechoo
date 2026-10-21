@@ -91,6 +91,8 @@ export const api = {
   },
   removerFoto: () => requisitar('/prestadores/foto', { metodo: 'DELETE', autenticado: true }),
   alternarPausa: () => requisitar('/prestadores/pausa', { metodo: 'PATCH', autenticado: true }),
+  // US06 - chave Pix e selo
+  cadastrarChavePix: (corpo) => requisitar('/prestadores/chave-pix', { metodo: 'PUT', corpo, autenticado: true }),
 
   listarPrestadores: (filtros = {}) => {
     const busca = new URLSearchParams();
@@ -110,6 +112,12 @@ export const api = {
   servico: (id) => requisitar(`/servicos/${id}`, { autenticado: true }),
   enviarOrcamento: (id, corpo) => requisitar(`/servicos/${id}/orcamento`, { metodo: 'POST', corpo, autenticado: true }),
   recusarOrcamento: (id) => requisitar(`/servicos/${id}/recusar`, { metodo: 'POST', autenticado: true }),
+  // US11 / US17 - aceitar o orçamento gera o Pix
+  aceitarOrcamento: (id, corpo) => requisitar(`/servicos/${id}/aceitar`, { metodo: 'POST', corpo, autenticado: true }),
+
+  // US11 / US18 - avisos
+  notificacoes: () => requisitar('/notificacoes', { autenticado: true }),
+  marcarNotificacoesLidas: () => requisitar('/notificacoes/lidas', { metodo: 'POST', autenticado: true }),
 
   // US12 - chat
   mensagens: (id, depois = 0) => requisitar(`/servicos/${id}/mensagens${depois ? `?depois=${depois}` : ''}`, { autenticado: true }),

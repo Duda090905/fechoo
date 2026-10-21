@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../servicos/api';
 import { useAuth } from '../contexto/AuthContexto';
 import Aviso from '../componentes/Aviso';
-import { IconeCalendario, IconeConversa, IconeLocal } from '../componentes/Icones';
+import Botao from '../componentes/Botao';
+import { IconeCadeado, IconeCalendario, IconeConversa, IconeLocal } from '../componentes/Icones';
 import {
   NOMES_STATUS, chaveDoDia, folhaDoDia, formatarDia, formatarHora
 } from '../utils/formatos';
@@ -58,6 +59,10 @@ function LinhaPedido({ servico, papel }) {
         <span className="pedido__meta">
           {formatarDia(servico.horario)}, às {formatarHora(servico.horario)}
           <span className="pedido__bairro"><IconeLocal width="14" height="14" aria-hidden="true" /> {servico.bairro?.nome}</span>
+          {/* US17 - Pix gerado, esperando o banco confirmar */}
+          {servico.pagamento?.em_aberto && (
+            <span className="pedido__pix"><IconeCadeado width="14" height="14" aria-hidden="true" /> Pix esperando pagamento</span>
+          )}
         </span>
       </span>
       <EtiquetaStatus status={servico.status} />
@@ -129,6 +134,23 @@ export default function Servicos() {
   const [compromissos, setCompromissos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  const [avisos, setAvisos] = useState([]);
+
+  // US11 / US18 - avisos ainda não lidos (pagamento garantido / confirmado)
+  useEffect(() => {
+    api.notificacoes()
+      .then((d) => setAvisos((d.notificacoes || []).filter((n) => !n.lida)))
+      .catch(() => {});
+  }, []);
+
+  async function marcarLidos() {
+    try {
+      await api.marcarNotificacoesLidas();
+      setAvisos([]);
+    } catch (e) {
+      setErro(e.message);
+    }
+  }
 
   useEffect(() => {
     Promise.all([api.listarServicos(), api.agenda()])
@@ -157,6 +179,20 @@ export default function Servicos() {
           </p>
         </div>
       </div>
+
+      {avisos.length > 0 && (
+        <section className="avisos" aria-label="Avisos">
+          {avisos.map((a) => (
+            <Link key={a.id} to={`/servicos/${a.servico_id}`} className="avisos__item">
+              <IconeCadeado width="18" height="18" aria-hidden="true" />
+              <span><strong>{a.titulo}</strong>{a.texto}</span>
+            </Link>
+          ))}
+          <div className="avisos__acoes">
+            <Botao tipo="texto" type="button" onClick={marcarLidos}>Marcar como lidos</Botao>
+          </div>
+        </section>
+      )}
 
       <div className="abas" role="tablist" aria-label="Pedidos ou agenda">
         <button

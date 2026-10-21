@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api } from '../servicos/api';
 import Aviso from '../componentes/Aviso';
@@ -6,15 +6,19 @@ import Botao from '../componentes/Botao';
 import Campo from '../componentes/Campo';
 import Chat from '../componentes/Chat';
 import ImagemProtegida from '../componentes/ImagemProtegida';
+import PagamentoPix from '../componentes/PagamentoPix';
 import { EtiquetaStatus } from './Servicos';
-import { IconeCalendario, IconeLocal, IconeVoltar } from '../componentes/Icones';
+import { IconeCadeado, IconeCalendario, IconeLocal, IconeVoltar } from '../componentes/Icones';
 import {
   deCampoDataHora, duracao, formatarDataHora, formatarDinheiro, formatarHora, lerDinheiro, paraCampoDataHora
 } from '../utils/formatos';
+import '../componentes/pagamento.css';
 import './painel.css';
 import './servicos.css';
 
 const PRAZO_MAXIMO = 24;
+// US17 - enquanto o Pix espera pagamento, a tela pergunta à API a cada 4 s.
+const INTERVALO_PIX_MS = 4000;
 const HORA_MS = 60 * 60 * 1000;
 
 // US10 - o orçamento como um comprovante: valor, deslocamento e total
@@ -151,6 +155,74 @@ function FormularioOrcamento({ servico, aoEnviar }) {
   );
 }
 
+// US11 / US17 - o contratante informa o endereço e gera o Pix.
+function FormularioAceite({ servico, aoAceitar, aoVoltar }) {
+  const [endereco, setEndereco] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const nome = (servico.prestador?.nome || '').split(' ')[0];
+
+  async function enviar(evento) {
+    evento.preventDefault();
+    setErro('');
+    if (endereco.trim().length < 5) { setErro('Informe a rua e o número onde o serviço vai ser feito.'); return; }
+    setEnviando(true);
+    try {
+      await aoAceitar({ endereco: endereco.trim() });
+    } catch (e) {
+      setErro(e.message);
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <form className="aceite" onSubmit={enviar} noValidate>
+      <Aviso>{erro}</Aviso>
+      <Campo
+        etiqueta={`Endereço do atendimento (bairro ${servico.bairro?.nome})`}
+        placeholder="Rua, número e complemento"
+        value={endereco}
+        maxLength={200}
+        onChange={(e) => setEndereco(e.target.value)}
+        ajuda={`${nome} só vê o endereço depois que o pagamento for confirmado.`}
+        autoComplete="street-address"
+        required
+      />
+      <p className="aceite__nota">
+        <IconeCadeado width="16" height="16" aria-hidden="true" />
+        <span>
+          Você vai pagar {formatarDinheiro(servico.orcamento.total)} por Pix. O dinheiro fica congelado no Fechô
+          e só vai para {nome} depois que você confirmar que o serviço foi feito.
+        </span>
+      </p>
+      <div className="empilha">
+        <Botao type="submit" carregando={enviando}>Gerar o Pix</Botao>
+        <Botao tipo="secundario" type="button" onClick={aoVoltar}>Voltar</Botao>
+      </div>
+    </form>
+  );
+}
+
+// US17 / US18 - pagamento Retido: o dinheiro está congelado.
+function PagamentoCongelado({ servico, papel }) {
+  const { pagamento } = servico;
+  if (!pagamento || pagamento.status !== 'retido') return null;
+  const nome = ((papel === 'prestador' ? servico.contratante?.nome : servico.prestador?.nome) || '').split(' ')[0];
+  return (
+    <div className="congelado" role="status">
+      <IconeCadeado className="congelado__icone" width="20" height="20" aria-hidden="true" />
+      <div>
+        <strong>{papel === 'prestador' ? 'Pagamento garantido' : 'Pagamento congelado'}</strong>
+        <span>
+          {papel === 'prestador'
+            ? `O Pix de ${formatarDinheiro(pagamento.valor)} já caiu e está guardado no Fechô. Você recebe quando ${nome} confirmar o serviço.`
+            : `Seu Pix de ${formatarDinheiro(pagamento.valor)} chegou. O dinheiro fica guardado até você confirmar que o serviço foi feito.`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function ServicoDetalhe() {
   const { id } = useParams();
   const { state } = useLocation();
@@ -160,6 +232,8 @@ export default function ServicoDetalhe() {
   const [confirmarRecusa, setConfirmarRecusa] = useState(false);
   const [recusando, setRecusando] = useState(false);
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
+  const [aceitando, setAceitando] = useState(false);
+  const statusAnterior = useRef(null);
 
   const carregar = useCallback(() => {
     api.servico(id)
@@ -168,6 +242,32 @@ export default function ServicoDetalhe() {
   }, [id]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // US18 - enquanto o Pix espera, consulta a API até o banco confirmar.
+  const pixEmAberto = Boolean(servico?.pagamento?.em_aberto);
+  useEffect(() => {
+    if (!pixEmAberto) return undefined;
+    const consulta = setInterval(carregar, INTERVALO_PIX_MS);
+    return () => clearInterval(consulta);
+  }, [pixEmAberto, carregar]);
+
+  // Avisa na tela quando o serviço vira Aceito enquanto ela está aberta.
+  useEffect(() => {
+    if (!servico) return;
+    if (statusAnterior.current === 'orcamento_enviado' && servico.status === 'aceito') {
+      setMensagem(servico.papel === 'contratante'
+        ? 'Pagamento confirmado! O dinheiro está congelado e o profissional já pode ver o endereço.'
+        : 'Pagamento garantido! O endereço do atendimento já aparece no pedido.');
+    }
+    statusAnterior.current = servico.status;
+  }, [servico]);
+
+  async function aceitar(corpo) {
+    const dados = await api.aceitarOrcamento(id, corpo);
+    setServico((atual) => ({ ...atual, ...dados.servico }));
+    setAceitando(false);
+    setMensagem('');
+  }
 
   async function enviarOrcamento(corpo) {
     const dados = await api.enviarOrcamento(id, corpo);
@@ -233,6 +333,25 @@ export default function ServicoDetalhe() {
                 <IconeCalendario width="18" height="18" aria-hidden="true" />
                 <span>Pedido para {formatarDataHora(servico.data_hora_solicitada)}</span>
               </li>
+              {/* US11 - endereço só do aceite em diante */}
+              {servico.endereco ? (
+                <li className="pedido-endereco">
+                  <IconeLocal width="18" height="18" aria-hidden="true" />
+                  <span>
+                    <strong>{servico.endereco.logradouro}</strong>
+                    <small>
+                      {papel === 'prestador'
+                        ? 'Endereço liberado porque o pagamento está congelado.'
+                        : `Visível para ${primeiroNome} porque o pagamento está congelado.`}
+                    </small>
+                  </span>
+                </li>
+              ) : papel === 'prestador' && ['aguardando_orcamento', 'orcamento_enviado'].includes(servico.status) && (
+                <li>
+                  <IconeCadeado width="18" height="18" aria-hidden="true" />
+                  <span>O endereço completo aparece aqui quando o cliente aceitar e o pagamento for confirmado.</span>
+                </li>
+              )}
             </ul>
             {servico.fotos.length > 0 && (
               <div className="pedido-fotos">
@@ -275,17 +394,44 @@ export default function ServicoDetalhe() {
             {servico.orcamento && <Comprovante servico={servico} papel={papel} />}
 
             {servico.status === 'orcamento_enviado' && papel === 'prestador' && (
-              <p className="pedido-nota">Orçamento enviado. Agora é com {primeiroNome}.</p>
+              <p className="pedido-nota">
+                {servico.pagamento?.em_aberto
+                  ? `${primeiroNome} aceitou e está pagando o Pix. Assim que o banco confirmar, o endereço aparece aqui.`
+                  : `Orçamento enviado. Agora é com ${primeiroNome}.`}
+              </p>
             )}
 
+            {/* US11 / US17 - aceitar gera o Pix; o Pix aberto aparece aqui */}
             {servico.status === 'orcamento_enviado' && papel === 'contratante' && (
+              servico.pagamento?.em_aberto ? (
+                <PagamentoPix pagamento={servico.pagamento} outraParte={primeiroNome} aoVencer={carregar} />
+              ) : aceitando ? (
+                <FormularioAceite servico={servico} aoAceitar={aceitar} aoVoltar={() => setAceitando(false)} />
+              ) : (
+                <>
+                  {servico.pagamento?.expirado && (
+                    <p className="pedido-nota">O Pix anterior venceu sem pagamento. Se ainda quiser, aceite de novo.</p>
+                  )}
+                  {!confirmarRecusa && (
+                    <Botao type="button" className="aceitar" onClick={() => setAceitando(true)}>
+                      Aceitar e pagar com Pix
+                    </Botao>
+                  )}
+                </>
+              )
+            )}
+
+            {servico.status === 'orcamento_enviado' && papel === 'contratante' && !aceitando && (
               !confirmarRecusa ? (
                 <Botao tipo="perigo" type="button" onClick={() => setConfirmarRecusa(true)} className="recusar">
                   Recusar orçamento
                 </Botao>
               ) : (
                 <div className="confirmar">
-                  <p>Recusar encerra este pedido e a conversa. Quer mesmo recusar?</p>
+                  <p>
+                    Recusar encerra este pedido e a conversa
+                    {servico.pagamento?.em_aberto ? ', e o Pix gerado deixa de valer' : ''}. Quer mesmo recusar?
+                  </p>
                   <div className="empilha">
                     <Botao tipo="perigo" type="button" carregando={recusando} onClick={recusar}>Recusar orçamento</Botao>
                     <Botao tipo="secundario" type="button" onClick={() => setConfirmarRecusa(false)}>Voltar</Botao>
@@ -297,6 +443,8 @@ export default function ServicoDetalhe() {
             {servico.status === 'recusado' && (
               <p className="pedido-nota">Orçamento recusado. Este pedido foi encerrado.</p>
             )}
+
+            <PagamentoCongelado servico={servico} papel={papel} />
           </section>
         </div>
 

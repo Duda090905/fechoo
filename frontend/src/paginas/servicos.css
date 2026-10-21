@@ -221,3 +221,24 @@
   .pedido .status { margin-left: 66px; }
   .duas-colunas { grid-template-columns: 1fr; }
 }
+
+/* Sprint 3 - aceite, endereço liberado e Pix na lista */
+.aceitar { margin-top: 16px; }
+.aceitar + .recusar { margin-top: 10px; }
+.pedido-dados li.pedido-endereco { align-items: flex-start; }
+.pedido-endereco > svg { margin-top: 2px; }
+.pedido-endereco span { display: flex; flex-direction: column; color: var(--texto); }
+.pedido-endereco small { color: var(--texto-claro); font-size: 13px; }
+.pedido__pix { display: inline-flex; align-items: center; gap: 4px; color: #146B49; font-weight: 500; }
+
+/* US11 / US18 - avisos no topo de Meus serviços */
+.avisos { margin: 0 0 22px; display: grid; gap: 10px; }
+.avisos__item {
+  display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px;
+  border-radius: var(--raio); background: var(--verde-fraco); color: #2C5E48; text-decoration: none;
+}
+.avisos__item svg { flex: 0 0 auto; color: var(--verde); margin-top: 2px; }
+.avisos__item strong { display: block; color: #146B49; font-family: var(--fonte-titulo); font-size: 15.5px; }
+.avisos__item span { font-size: 14.5px; }
+.avisos__item:hover { filter: brightness(.98); }
+.avisos__acoes { display: flex; justify-content: flex-end; }

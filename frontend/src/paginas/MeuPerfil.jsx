@@ -6,13 +6,78 @@ import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
 import Selecao from '../componentes/Selecao';
 import Avatar from '../componentes/Avatar';
-import { IconeEscudo, IconeBusca } from '../componentes/Icones';
+import { IconeEscudo, IconeBusca, IconeSelo } from '../componentes/Icones';
+import { cpfValido, formatarCpf } from '../utils/formatos';
 import './painel.css';
 
 const LIMITE = 5;
 const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
 const LIMITE_FOTO_MB = 2;
 const VAZIO = { descricao: '', foto_url: '', categorias: [], bairros: [], atende_apenas_mulheres: false };
+
+// US06 - verificação de identidade pela chave Pix (tipo CPF). Sem foto de
+// documento: a chave precisa ser o CPF da própria conta.
+function CartaoChavePix({ identidade, aoConfirmar }) {
+  const [trocando, setTrocando] = useState(false);
+  const [chave, setChave] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const verificado = identidade.verificado;
+
+  async function enviar(evento) {
+    evento.preventDefault();
+    setErro('');
+    if (!cpfValido(chave)) { setErro('Digite os 11 números do seu CPF.'); return; }
+    setEnviando(true);
+    try {
+      await aoConfirmar({ tipo: 'cpf', chave });
+      setTrocando(false);
+      setChave('');
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="cartao">
+      <h2>Receber pelo Pix</h2>
+      {verificado && !trocando ? (
+        <>
+          <p className="identidade">
+            <span className="selo-grande"><IconeSelo width="16" height="16" aria-hidden="true" /> Identidade verificada</span>
+          </p>
+          <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+            Você recebe os pagamentos na chave Pix CPF <b>{identidade.chave_pix?.mascarada}</b>.
+            Como a chave está no seu CPF, seu perfil mostra o selo para quem procura profissionais.
+          </p>
+          <Botao tipo="secundario" className="botao--curto" type="button" onClick={() => setTrocando(true)}>Trocar chave</Botao>
+        </>
+      ) : (
+        <form onSubmit={enviar} noValidate>
+          <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+            Cadastre a chave Pix em que você quer receber. Ela precisa ser do tipo CPF e ser o mesmo CPF desta conta:
+            assim confirmamos que é você, sem pedir foto de documento. Quem confirma ganha o selo de identidade verificada.
+          </p>
+          <Aviso>{erro}</Aviso>
+          <Campo
+            etiqueta="Chave Pix (CPF)"
+            inputMode="numeric"
+            placeholder="000.000.000-00"
+            value={chave}
+            onChange={(e) => setChave(formatarCpf(e.target.value))}
+            required
+          />
+          <div className="empilha">
+            <Botao type="submit" carregando={enviando}>Confirmar chave Pix</Botao>
+            {trocando && <Botao tipo="secundario" type="button" onClick={() => { setTrocando(false); setErro(''); }}>Cancelar</Botao>}
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 export default function MeuPerfil() {
   const { usuario } = useAuth();
@@ -32,6 +97,8 @@ export default function MeuPerfil() {
   const [previa, setPrevia] = useState('');
   const [removerFoto, setRemoverFoto] = useState(false);
   const campoArquivo = useRef(null);
+  // US06
+  const [identidade, setIdentidade] = useState({ verificado: false, chave_pix: null });
 
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
@@ -52,6 +119,7 @@ export default function MeuPerfil() {
           bairros: p.bairros.map((b) => b.id),
           atende_apenas_mulheres: p.atende_apenas_mulheres
         };
+        if (p) setIdentidade({ verificado: p.verificado, chave_pix: p.chave_pix });
         if (p && p.categorias.length) {
           setPerfil(salvo);
           setRascunho(salvo);
@@ -71,6 +139,13 @@ export default function MeuPerfil() {
     }
     carregar();
   }, []);
+
+  async function confirmarChavePix(corpo) {
+    const dados = await api.cadastrarChavePix(corpo);
+    setIdentidade({ verificado: dados.prestador.verificado, chave_pix: dados.prestador.chave_pix });
+    setMensagem(dados.mensagem);
+    setErro('');
+  }
 
   function alternar(campo, id) {
     setRascunho((atual) => {
@@ -252,6 +327,8 @@ export default function MeuPerfil() {
               </div>
             )}
           </div>
+
+          <CartaoChavePix identidade={identidade} aoConfirmar={confirmarChavePix} />
 
           <div className="cartao">
             <h2>{status === 'ativo' ? 'Precisa dar uma pausa?' : 'Pronto para voltar?'}</h2>

@@ -328,6 +328,16 @@ async function testarSprint3({ chamar, chamarForm, checar, capturarConsole, base
   checar('Pix pago depois da recusa nao reabre o servico (fica registrado para devolucao)',
     pagoDepoisDeRecusar.dados.resultado === 'servico_fora_do_fluxo' && (await Servico.findByPk(idRecusa)).status === 'recusado');
 
+  // ---------------------------------------------------------------------
+  console.log('\nUS04 - Servico aceito e pagamento congelado bloqueiam a saida');
+  const pendenciasLia = await chamar('/conta/pendencias', { token: tLia });
+  const pendenciasCaio = await chamar('/conta/pendencias', { token: tCaio });
+  checar('com servico aceito e pagamento Retido, as duas partes veem a pendencia',
+    pendenciasLia.dados.pode_desativar === false && pendenciasCaio.dados.pode_desativar === false
+    && pendenciasLia.dados.pendencias.some((p) => p.tipo === 'valor_retido'));
+  const desativarLia = await chamar('/conta', { metodo: 'DELETE', token: tLia, corpo: { confirmacao: 'DESATIVAR' } });
+  checar('quem tem pagamento congelado nao consegue desativar a conta', desativarLia.status === 409);
+
   return { tLia, tCaio, idServico };
 }
 

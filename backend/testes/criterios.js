@@ -1,5 +1,5 @@
 /**
- * Verificacao dos criterios de aceite dos Sprints 1, 2 e 3.
+ * Verificacao dos criterios de aceite dos Sprints 1, 2, 3 e 4.
  * Sobe a API em memoria (sqlite) e chama os endpoints de verdade.
  *
  * Rodar com: npm run teste
@@ -776,14 +776,15 @@ async function rodar() {
 
   // Sem avaliacoes nem servicos concluidos: vale a ordem de cadastro (Rita antes de Eli).
   const semNota = nomes(comSelo);
-  await Prestador.update({ nota_media: 4.2 }, { where: { id: rita.id } });
-  await Prestador.update({ nota_media: 4.8 }, { where: { id: eli.id } });
+  // US24 (Sprint 4): a nota so mexe na ordem a partir de 5 avaliacoes.
+  await Prestador.update({ nota_media: 4.2, total_avaliacoes: 5 }, { where: { id: rita.id } });
+  await Prestador.update({ nota_media: 4.8, total_avaliacoes: 5 }, { where: { id: eli.id } });
   const porNota = await chamar(`/prestadores?categoria=${eletricista}&bairro=${bairro.id}`);
   checar('ordena pela avaliacao media, da maior para a menor',
     semNota[0] === PRESTADORA.nome && nomes(porNota)[0] === 'Eli Santos'
     && porNota.dados.prestadores[0].nota_media === 4.8);
 
-  await Prestador.update({ nota_media: null }, { where: { id: [rita.id, eli.id] } });
+  await Prestador.update({ nota_media: null, total_avaliacoes: 0 }, { where: { id: [rita.id, eli.id] } });
   const contratanteMara = await sequelize.models.Usuario.findByPk(mara.id);
   await Servico.bulkCreate([
     { id_contratante: contratanteMara.id, id_prestador: eli.id, bairro_id: bairro.id, descricao: 'Concluido antes', fotos: [], data_hora_solicitada: new Date(Date.now() - 10 * DIA), status: 'pago' },
@@ -1143,7 +1144,13 @@ async function rodar() {
   // SPRINT 3 - US06, US17, US18 e US11 (arquivo testes/sprint3.js)
   // =======================================================================
   const { testarSprint3 } = require('./sprint3');
-  await testarSprint3({ chamar, chamarForm, checar, capturarConsole, base, bairro, idsCategorias, terceiro: otto });
+  const sprint3 = await testarSprint3({ chamar, chamarForm, checar, capturarConsole, base, bairro, idsCategorias, terceiro: otto });
+
+  // =======================================================================
+  // SPRINT 4 - US20, US21, US15, US14, US24 e US16 (arquivo testes/sprint4.js)
+  // =======================================================================
+  const { testarSprint4 } = require('./sprint4');
+  await testarSprint4({ chamar, checar, base, bairro, idsCategorias, terceiro: otto, sprint3 });
 
   servidor.close();
   await sequelize.close();

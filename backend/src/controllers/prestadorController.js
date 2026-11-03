@@ -4,6 +4,9 @@ const { iniciarPausa, retomar } = require('../servicos/pausas');
 const { detectarTipo, salvarFotoPerfil, removerFotoPerfil, urlPublica } = require('../servicos/armazenamento');
 const { cpfValido, limpar } = require('../utils/cpf');
 
+const { MINIMO_PARA_BUSCA } = require('../servicos/avaliacoes');
+const { faixaDoPrestador } = require('../servicos/taxa');
+
 const LIMITE_CATEGORIAS = 5;
 
 // US06 - a chave Pix aparece so para a propria pessoa, mascarada.
@@ -24,6 +27,8 @@ function montarPerfil(prestador, servicosConcluidos = 0, { proprio = false } = {
     status: prestador.status,
     atende_apenas_mulheres: prestador.atende_apenas_mulheres,
     nota_media: prestador.nota_media === null || prestador.nota_media === undefined ? null : Number(prestador.nota_media),
+    // US24 - quantas avaliacoes formam a nota
+    total_avaliacoes: prestador.total_avaliacoes || 0,
     servicos_concluidos: servicosConcluidos,
     verificado: Boolean(prestador.verificado),
     categorias: (prestador.categorias || []).map((c) => ({ id: c.id, nome: c.nome })),
@@ -52,7 +57,10 @@ async function meuPerfil(req, res, next) {
     });
     if (!prestador) return res.json({ prestador: null });
     const concluidos = await contarConcluidos([prestador.id]);
-    return res.json({ prestador: montarPerfil(prestador, concluidos.get(prestador.id) || 0, { proprio: true }) });
+    const perfil = montarPerfil(prestador, concluidos.get(prestador.id) || 0, { proprio: true });
+    // US21 - faixa de taxa atual e quanto falta para a proxima.
+    perfil.taxa = await faixaDoPrestador(prestador.id);
+    return res.json({ prestador: perfil });
   } catch (e) {
     return next(e);
   }
@@ -253,6 +261,10 @@ async function cadastrarChavePix(req, res, next) {
     if (!prestador.verificado_em) prestador.verificado_em = new Date();
     await prestador.save();
 
+    // US20 - se havia repasse esperando a chave, tenta agora.
+    const { repassarPendentesDoPrestador } = require('../servicos/repasse');
+    await repassarPendentesDoPrestador(prestador.id).catch((e) => console.error('[repasse]', e.message));
+
     const concluidos = await contarConcluidos([prestador.id]);
     return res.json({
       mensagem: 'Chave Pix confirmada. Seu perfil agora mostra o selo de identidade verificada.',
@@ -285,9 +297,16 @@ async function contarConcluidos(ids) {
 
 // US09 - avaliacao media (sem nota vai para o fim), depois servicos
 // concluidos. Empate: quem se cadastrou primeiro.
+// US24 - a nota so mexe na posicao a partir de 5 avaliacoes. Com menos, o
+// prestador e ordenado como quem ainda nao tem nota (nao sobe nem cai por ela).
+function notaParaOrdem(p) {
+  if (p.nota_media === null || p.total_avaliacoes < MINIMO_PARA_BUSCA) return -1;
+  return p.nota_media;
+}
+
 function ordenarParaBusca(a, b) {
-  const notaA = a.nota_media === null ? -1 : a.nota_media;
-  const notaB = b.nota_media === null ? -1 : b.nota_media;
+  const notaA = notaParaOrdem(a);
+  const notaB = notaParaOrdem(b);
   if (notaA !== notaB) return notaB - notaA;
   if (a.servicos_concluidos !== b.servicos_concluidos) return b.servicos_concluidos - a.servicos_concluidos;
   return a.id - b.id;
@@ -347,5 +366,6 @@ async function listar(req, res, next) {
 }
 
 module.exports = {
+  montarPerfil, contarConcluidos,
   meuPerfil, salvarPerfil, enviarFoto, removerFoto, alternarPausa, listar, cadastrarChavePix
 };

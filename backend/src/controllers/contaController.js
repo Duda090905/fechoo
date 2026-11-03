@@ -11,8 +11,16 @@ function registrarSolicitacao(usuarioId, tipo, resultado) {
 }
 
 // US02 - dados da propria conta
-async function meusDados(req, res) {
-  return res.json({ usuario: req.usuario.publico() });
+async function meusDados(req, res, next) {
+  try {
+    // US15 - os cancelamentos ficam contados no historico da pessoa.
+    const { contarCancelamentos } = require('../servicos/cancelamento');
+    const usuario = req.usuario.publico();
+    usuario.cancelamentos = await contarCancelamentos(req.usuario.id);
+    return res.json({ usuario });
+  } catch (e) {
+    return next(e);
+  }
 }
 
 // US04 - o que impede sair

@@ -16,6 +16,9 @@ class Prestador extends Model {
       // US09 - a busca ordena por esta nota e o cartao a exibe. Vazia ate
       // existirem avaliacoes: quem calcula e grava a media e a US24.
       nota_media: { type: DataTypes.DECIMAL(3, 2), allowNull: true },
+      // US24 - quantas avaliacoes entram na media. Com menos de 5, a nota
+      // aparece no cartao, mas nao mexe na posicao da busca.
+      total_avaliacoes: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 0 },
       // US09 / US06 - selo de identidade verificada. So a US06 marca o campo:
       // quando a chave Pix cadastrada esta no CPF da propria conta.
       verificado: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },

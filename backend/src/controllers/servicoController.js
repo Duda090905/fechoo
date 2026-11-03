@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const {
-  Servico, Mensagem, Prestador, Usuario, Bairro, Categoria, Pagamento, AcessoEndereco
+  Servico, Mensagem, Prestador, Usuario, Bairro, Categoria, Pagamento, AcessoEndereco,
+  Reagendamento, Avaliacao, HistoricoServico
 } = require('../models');
 const {
   detectarTipo, salvarArquivoServico, removerArquivoServico, caminhoArquivoServico, urlPublica
@@ -10,6 +11,11 @@ const {
   emAberto, encerrarSeVencida, pagamentoDoServico, gerarCobranca
 } = require('../servicos/cobrancas');
 const { GatewayErro } = require('../servicos/gateway');
+const { prazoConfirmacao } = require('../servicos/repasse');
+const {
+  prazoParaAvaliar, mediaDoContratante, EDICAO_HORAS
+} = require('../servicos/avaliacoes');
+const { registrar } = require('../servicos/historico');
 
 const LIMITE_DESCRICAO = 1000;
 const LIMITE_MENSAGEM = 1000;
@@ -78,6 +84,7 @@ async function gravarImagens(imagens) {
 
 const INCLUDE_CONTRATANTE = { model: Usuario, as: 'contratante', attributes: ['id', 'nome'] };
 const INCLUDE_BAIRRO = { model: Bairro, as: 'bairro', attributes: ['id', 'nome'] };
+const INCLUDE_CATEGORIA = { model: Categoria, as: 'categoria', attributes: ['id', 'nome'] };
 
 function includePrestador({ comBairros = false } = {}) {
   const include = [{ model: Usuario, as: 'usuario', attributes: ['id', 'nome'] }];
@@ -96,7 +103,7 @@ function papelNoServico(servico, usuario) {
 async function carregarDaParte(req, res) {
   const id = inteiroPositivo(req.params.id);
   const servico = id && await Servico.findByPk(id, {
-    include: [INCLUDE_CONTRATANTE, includePrestador({ comBairros: true }), INCLUDE_BAIRRO]
+    include: [INCLUDE_CONTRATANTE, includePrestador({ comBairros: true }), INCLUDE_BAIRRO, INCLUDE_CATEGORIA]
   });
   const papel = servico ? papelNoServico(servico, req.usuario) : null;
   if (!papel) {
@@ -128,6 +135,20 @@ function montarPagamento(pagamento, papel, { comPix = false } = {}) {
     expira_em: pagamento.expira_em,
     expirado: !aberto && pagamento.status === 'aguardando',
     retido_em: pagamento.retido_em,
+    // US20 / US21 - repasse ao prestador. A taxa so aparece para ele.
+    repasse: papel === 'prestador' && pagamento.valor_repasse !== null && pagamento.valor_repasse !== undefined
+      ? {
+        taxa_percentual: emReais(pagamento.taxa_percentual),
+        taxa: emReais(pagamento.taxa_valor),
+        valor: emReais(pagamento.valor_repasse),
+        pendente: pagamento.repasse_pendente,
+        liberado_em: pagamento.liberado_em
+      }
+      : undefined,
+    // US15 - devolucao ao contratante
+    estorno: pagamento.estornado_em
+      ? { valor: emReais(pagamento.valor_estorno), estornado_em: pagamento.estornado_em }
+      : undefined,
     pix: comPix && aberto && papel === 'contratante'
       ? {
         copia_cola: pagamento.pix_copia_cola,
@@ -180,6 +201,24 @@ function montarServico(servico, papel, { pagamento, comPix = false, comEndereco 
     encerrado_em: servico.encerrado_em,
     criado_em: servico.createdAt,
     aceito_em: servico.aceito_em,
+    categoria: servico.categoria ? { id: servico.categoria.id, nome: servico.categoria.nome } : null,
+    // US15 - "Cheguei". US20 - os passos da conclusao.
+    chegou_em: servico.chegou_em,
+    iniciado_em: servico.iniciado_em,
+    concluido_em: servico.concluido_em,
+    confirmado_em: servico.confirmado_em,
+    confirmacao_automatica: servico.confirmacao_automatica,
+    pago_em: servico.pago_em,
+    prazo_confirmacao: servico.status === 'concluido' ? prazoConfirmacao(servico) : null,
+    // US15 - quem cancelou, por que e qual regra valeu.
+    cancelamento: servico.status === 'cancelado'
+      ? {
+        por: servico.cancelado_papel,
+        motivo: servico.motivo_cancelamento,
+        regra: servico.regra_cancelamento,
+        em: servico.cancelado_em
+      }
+      : null,
     // US17 - status do pagamento (tabela propria)
     pagamento: pagamento === undefined ? undefined : montarPagamento(pagamento, papel, { comPix }),
     // US11 - o endereco so sai do aceite em diante. Antes disso, nem a chave
@@ -249,6 +288,9 @@ async function criar(req, res, next) {
     const bairroId = inteiroPositivo(req.body.bairro_id);
     const dataHora = lerDataHora(req.body.data_hora);
     const idPrestador = inteiroPositivo(req.body.id_prestador);
+    // US16 - categoria do pedido (opcional; vem da busca ou do "chamar de novo").
+    const temCategoria = req.body.categoria_id !== undefined && req.body.categoria_id !== '';
+    const categoriaId = temCategoria ? inteiroPositivo(req.body.categoria_id) : null;
 
     if (!descricao) {
       return res.status(400).json({ erro: 'Descreva o serviço de que você precisa.' });
@@ -280,6 +322,9 @@ async function criar(req, res, next) {
     if (!prestador) {
       return res.status(404).json({ erro: 'Esse profissional não está disponível para novos pedidos.' });
     }
+    if (temCategoria && !(categoriaId && prestador.categorias.some((c) => c.id === categoriaId))) {
+      return res.status(400).json({ erro: 'Este profissional não atende essa categoria.' });
+    }
     // US08 - a escolha da prestadora vale tambem para o pedido.
     if (prestador.atende_apenas_mulheres && req.usuario.sexo !== 'feminino') {
       return res.status(403).json({ erro: 'Esta profissional atende apenas mulheres.' });
@@ -304,6 +349,7 @@ async function criar(req, res, next) {
         descricao,
         fotos,
         data_hora_solicitada: dataHora,
+        categoria_id: categoriaId,
         status: 'aguardando_orcamento'
       });
     } catch (e) {
@@ -311,8 +357,9 @@ async function criar(req, res, next) {
       throw e;
     }
 
+    await registrar(servico.id, { usuarioId: req.usuario.id, acao: 'pedido', para: 'aguardando_orcamento' });
     const completo = await Servico.findByPk(servico.id, {
-      include: [INCLUDE_CONTRATANTE, includePrestador({ comBairros: true }), INCLUDE_BAIRRO]
+      include: [INCLUDE_CONTRATANTE, includePrestador({ comBairros: true }), INCLUDE_BAIRRO, INCLUDE_CATEGORIA]
     });
     return res.status(201).json({ servico: montarServico(completo, 'contratante') });
   } catch (e) {
@@ -329,7 +376,7 @@ async function listar(req, res, next) {
 
     const servicos = await Servico.findAll({
       where: filtro.where,
-      include: [INCLUDE_CONTRATANTE, includePrestador(), INCLUDE_BAIRRO],
+      include: [INCLUDE_CONTRATANTE, includePrestador(), INCLUDE_BAIRRO, INCLUDE_CATEGORIA],
       order: [['id', 'DESC']]
     });
     const pagamentos = await ultimosPagamentos(servicos);
@@ -361,6 +408,63 @@ async function agenda(req, res, next) {
   }
 }
 
+// US14 - reagendamentos do servico (o historico de quem propos e quando).
+function montarReagendamento(r, usuarioId) {
+  return {
+    id: r.id,
+    papel: r.papel,
+    meu: r.proposto_por_id === usuarioId,
+    data_hora_anterior: r.data_hora_anterior,
+    data_hora_nova: r.data_hora_nova,
+    motivo: r.motivo,
+    status: r.status,
+    proposto_em: r.createdAt,
+    respondido_em: r.respondido_em
+  };
+}
+
+function montarAvaliacao(a, { comResposta = true } = {}) {
+  return {
+    nota: a.nota,
+    comentario: a.comentario,
+    enviada_em: a.createdAt,
+    ...(comResposta ? { resposta: a.resposta, respondida_em: a.respondida_em } : {})
+  };
+}
+
+// US24 - o que a pessoa ve sobre as avaliacoes deste servico.
+async function blocoAvaliacoes(servico, papel, usuarioId, agora = new Date()) {
+  const podeExistir = ['confirmado', 'pago', 'resolvido'].includes(servico.status);
+  if (!podeExistir) return null;
+  const avaliacoes = await Avaliacao.findAll({ where: { servico_id: servico.id } });
+  const minha = avaliacoes.find((a) => a.autor_id === usuarioId);
+  const outra = avaliacoes.find((a) => a.autor_id !== usuarioId);
+  const prazo = prazoParaAvaliar(servico);
+  const dentroDoPrazo = Boolean(prazo) && agora < prazo;
+  return {
+    prazo_ate: prazo,
+    pode_avaliar: !minha && dentroDoPrazo,
+    minha: minha
+      ? {
+        ...montarAvaliacao(minha),
+        editavel_ate: minha.editavel_ate,
+        pode_editar: agora < new Date(minha.editavel_ate),
+        publicada: Boolean(minha.liberada_em)
+      }
+      : null,
+    // A da outra parte so aparece depois de publicada.
+    outra_enviou: Boolean(outra),
+    da_outra_parte: outra && outra.liberada_em
+      ? {
+        ...montarAvaliacao(outra),
+        // US24 - o prestador responde, uma vez, a avaliacao que recebeu.
+        pode_responder: papel === 'prestador' && !outra.resposta
+      }
+      : null,
+    edicao_horas: EDICAO_HORAS
+  };
+}
+
 async function detalhar(req, res, next) {
   try {
     const servico = await carregarDaParte(req, res);
@@ -374,9 +478,31 @@ async function detalhar(req, res, next) {
         servico_id: servico.id, usuario_id: req.usuario.id, papel: servico.papel, ip: req.ip || null
       });
     }
-    return res.json({
-      servico: montarServico(servico, servico.papel, { pagamento, comPix: true, comEndereco: liberado })
-    });
+    const [reagendamentos, historico, avaliacoes] = await Promise.all([
+      Reagendamento.findAll({ where: { servico_id: servico.id }, order: [['id', 'ASC']] }),
+      HistoricoServico.findAll({
+        where: { servico_id: servico.id },
+        include: [{ model: Usuario, as: 'usuario', attributes: ['id', 'nome'] }],
+        order: [['id', 'ASC']]
+      }),
+      blocoAvaliacoes(servico, servico.papel, req.usuario.id)
+    ]);
+    const resposta = montarServico(servico, servico.papel, { pagamento, comPix: true, comEndereco: liberado });
+    resposta.reagendamentos = reagendamentos.map((r) => montarReagendamento(r, req.usuario.id));
+    resposta.historico = historico.map((h) => ({
+      acao: h.acao,
+      status_anterior: h.status_anterior,
+      status_novo: h.status_novo,
+      detalhe: h.detalhe,
+      quem: h.usuario ? (h.usuario.id === req.usuario.id ? 'voce' : h.usuario.nome) : 'Fechô',
+      em: h.registrado_em
+    }));
+    resposta.avaliacoes = avaliacoes;
+    // US24 - o prestador ve a reputacao de quem pediu.
+    if (servico.papel === 'prestador' && servico.contratante) {
+      Object.assign(resposta.contratante, await mediaDoContratante(servico.contratante.id));
+    }
+    return res.json({ servico: resposta });
   } catch (e) {
     return next(e);
   }
@@ -514,6 +640,7 @@ async function enviarOrcamento(req, res, next) {
     servico.status = 'orcamento_enviado';
     servico.orcamento_enviado_em = new Date();
     await servico.save();
+    await registrar(servico.id, { usuarioId: req.usuario.id, acao: 'orcamento', de: 'aguardando_orcamento', para: 'orcamento_enviado' });
 
     return res.json({ servico: montarServico(servico, 'prestador') });
   } catch (e) {
@@ -542,6 +669,7 @@ async function recusar(req, res, next) {
 
     servico.status = 'recusado';
     await servico.save(); // o hook do modelo marca encerrado_em
+    await registrar(servico.id, { usuarioId: req.usuario.id, acao: 'recusa', de: 'orcamento_enviado', para: 'recusado' });
 
     return res.json({ servico: montarServico(servico, 'contratante') });
   } catch (e) {
@@ -637,7 +765,86 @@ async function enviarMensagem(req, res, next) {
   }
 }
 
+/**
+ * US16 - Historico e recontratacao. Os servicos do contratante que ja foram
+ * feitos (Confirmado ou Pago), com data, valor e a nota que ele deu. O
+ * prestador vem com o perfil da busca para o botao "Chamar de novo" abrir um
+ * pedido ja preenchido. Quem saiu da plataforma (ou esta fora do ar) aparece,
+ * mas sem o botao. ?categoria=<id> filtra.
+ */
+async function historico(req, res, next) {
+  try {
+    const { montarPerfil, contarConcluidos } = require('./prestadorController');
+    const filtroCategoria = req.query.categoria ? inteiroPositivo(req.query.categoria) : null;
+    if (req.query.categoria && !filtroCategoria) return res.status(400).json({ erro: 'Categoria inválida.' });
+
+    const servicos = await Servico.findAll({
+      where: { id_contratante: req.usuario.id, status: Servico.STATUS_CONCLUIDOS },
+      include: [
+        INCLUDE_BAIRRO,
+        INCLUDE_CATEGORIA,
+        {
+          model: Prestador, as: 'prestador',
+          include: [
+            { model: Usuario, as: 'usuario', attributes: ['id', 'nome', 'sexo', 'status'] },
+            { model: Categoria, as: 'categorias', attributes: ['id', 'nome'], through: { attributes: [] } },
+            { model: Bairro, as: 'bairros', attributes: ['id', 'nome'], through: { attributes: [] } }
+          ]
+        }
+      ]
+    });
+    servicos.sort((a, b) => new Date(b.horarioCombinado()) - new Date(a.horarioCombinado()));
+
+    // Categorias que aparecem no historico (para o filtro da tela).
+    const categorias = new Map();
+    servicos.forEach((s) => { if (s.categoria) categorias.set(s.categoria.id, s.categoria.nome); });
+
+    const lista = filtroCategoria ? servicos.filter((s) => s.categoria_id === filtroCategoria) : servicos;
+    const ids = lista.map((s) => s.id);
+    const [pagamentos, notas, concluidos] = await Promise.all([
+      ultimosPagamentos(lista),
+      ids.length ? Avaliacao.findAll({ where: { servico_id: ids, autor_id: req.usuario.id }, attributes: ['servico_id', 'nota'] }) : [],
+      contarConcluidos([...new Set(lista.map((s) => s.id_prestador))])
+    ]);
+    const minhaNota = new Map(notas.map((a) => [a.servico_id, a.nota]));
+
+    return res.json({
+      categorias: [...categorias].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)),
+      servicos: lista.map((s) => {
+        const p = s.prestador;
+        const situacao = !p || !p.usuario || p.usuario.status !== 'ativo' || p.status === 'suspenso'
+          ? 'saiu'
+          : (p.status === 'pausado' ? 'pausado' : 'disponivel');
+        const disponivel = situacao === 'disponivel' && p.categorias.length > 0 && p.bairros.length > 0;
+        const pagamento = pagamentos.get(s.id);
+        const total = s.valor !== null ? Math.round((Number(s.valor) + Number(s.taxa_deslocamento || 0)) * 100) / 100 : null;
+        return {
+          id: s.id,
+          descricao: s.descricao,
+          horario: s.horarioCombinado(),
+          status: s.status,
+          bairro: s.bairro ? { id: s.bairro.id, nome: s.bairro.nome } : null,
+          categoria: s.categoria ? { id: s.categoria.id, nome: s.categoria.nome } : null,
+          valor: pagamento ? Number(pagamento.valor) : total,
+          minha_nota: minhaNota.get(s.id) || null,
+          prestador: {
+            id: p ? p.id : null,
+            nome: p && p.usuario ? p.usuario.nome : null,
+            foto_url: p ? urlPublica(p.foto_url) : null,
+            situacao,
+            disponivel,
+            // Perfil da busca, so para quem ainda recebe pedidos.
+            perfil: disponivel ? montarPerfil(p, concluidos.get(p.id) || 0) : null
+          }
+        };
+      })
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
 module.exports = {
-  criar, listar, agenda, detalhar, aceitar, enviarOrcamento, recusar, arquivo, mensagens, enviarMensagem,
-  PRAZO_MAXIMO_HORAS
+  criar, listar, agenda, detalhar, aceitar, enviarOrcamento, recusar, arquivo, mensagens, enviarMensagem, historico,
+  carregarDaParte, montarServico, horarioOcupado, lerDataHora, PRAZO_MAXIMO_HORAS
 };

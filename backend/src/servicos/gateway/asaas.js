@@ -115,4 +115,38 @@ async function confirmarNoSandbox(cobrancaId) {
   return chamar(`/sandbox/payment/${cobrancaId}/confirm`, { metodo: 'POST' });
 }
 
-module.exports = { criarCobrancaPix, cancelarCobranca, confirmarNoSandbox, GatewayErro, urlBase };
+/**
+ * US20 / US15 - transfere por Pix da conta do Fechô no Asaas para a chave do
+ * prestador (repasse do servico ou multa de cancelamento).
+ *   POST /transfers  { value, pixAddressKey, pixAddressKeyType, description }
+ * No MVP a chave e sempre do tipo CPF (US06).
+ */
+async function transferirPix({ valor, chave, descricao }) {
+  const transferencia = await chamar('/transfers', {
+    metodo: 'POST',
+    corpo: {
+      value: valor,
+      operationType: 'PIX',
+      pixAddressKey: chave,
+      pixAddressKeyType: 'CPF',
+      description: descricao.slice(0, 140)
+    }
+  });
+  return { transferencia_id: transferencia.id };
+}
+
+/**
+ * US15 - devolve ao contratante o valor (inteiro ou parte) de uma cobranca paga.
+ *   POST /payments/{id}/refund  { value, description }
+ */
+async function estornarCobranca(cobrancaId, { valor, descricao }) {
+  const resposta = await chamar(`/payments/${cobrancaId}/refund`, {
+    metodo: 'POST',
+    corpo: { value: valor, description: descricao.slice(0, 140) }
+  });
+  return { estorno_id: (resposta.refunds && resposta.refunds[0] && resposta.refunds[0].id) || resposta.id || cobrancaId };
+}
+
+module.exports = {
+  criarCobrancaPix, cancelarCobranca, confirmarNoSandbox, transferirPix, estornarCobranca, GatewayErro, urlBase
+};

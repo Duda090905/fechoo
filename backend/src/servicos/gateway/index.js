@@ -35,6 +35,9 @@ module.exports = {
   avisosDeConfiguracao,
   criarCobrancaPix: (dados) => atual().criarCobrancaPix(dados),
   cancelarCobranca: (cobrancaId, gateway) => (gateway === 'asaas' ? asaas : simulado).cancelarCobranca(cobrancaId),
+  // US20 / US15 - o mesmo gateway que recebeu o Pix faz o repasse e o estorno.
+  transferirPix: (dados, gateway) => (gateway === 'asaas' ? asaas : simulado).transferirPix(dados),
+  estornarCobranca: (cobrancaId, dados, gateway) => (gateway === 'asaas' ? asaas : simulado).estornarCobranca(cobrancaId, dados),
   confirmarNoSandbox: asaas.confirmarNoSandbox,
   GatewayErro: asaas.GatewayErro
 };

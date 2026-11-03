@@ -5,6 +5,7 @@ const { iniciarRotinaRetencao } = require('./servicos/retencao');
 const { iniciarRotinaLembretes } = require('./servicos/lembretes');
 const { iniciarRotinaRetencaoMidias } = require('./servicos/retencaoMidias');
 const { iniciarRotinaCobrancas } = require('./servicos/cobrancas');
+const { iniciarRotinaConclusao } = require('./servicos/repasse');
 const { garantirColunas } = require('./database/colunas');
 const { nomeGateway, avisosDeConfiguracao } = require('./servicos/gateway');
 
@@ -27,6 +28,7 @@ async function iniciar() {
     iniciarRotinaLembretes(); // US13
     iniciarRotinaRetencaoMidias(); // US12
     iniciarRotinaCobrancas(); // US17
+    iniciarRotinaConclusao(); // US20 (72 horas), repasses pendentes e US24 (prazo das avaliacoes)
   } catch (e) {
     console.error('Nao consegui conectar no banco:', e.message);
     process.exit(1);

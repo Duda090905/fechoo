@@ -81,7 +81,25 @@ class Servico extends Model {
       // prestador quando o servico chega em Aceito.
       endereco: { type: DataTypes.STRING(200), allowNull: true },
       // US11 / US18 - quando virou Aceito (o pagamento ficou retido).
-      aceito_em: { type: DataTypes.DATE, allowNull: true }
+      aceito_em: { type: DataTypes.DATE, allowNull: true },
+      // US16 - categoria do pedido (vem da busca), para filtrar o historico.
+      categoria_id: { type: DataTypes.INTEGER, allowNull: true },
+      // US15 - o prestador apertou "Cheguei": a partir daqui, o cancelamento
+      // do contratante divide o valor 50/50.
+      chegou_em: { type: DataTypes.DATE, allowNull: true },
+      // US20 - Aceito -> Em execucao -> Concluido pelo prestador -> Confirmado -> Pago
+      iniciado_em: { type: DataTypes.DATE, allowNull: true },
+      concluido_em: { type: DataTypes.DATE, allowNull: true },
+      confirmado_em: { type: DataTypes.DATE, allowNull: true },
+      // true: ninguem confirmou em 72 horas e o sistema confirmou sozinho.
+      confirmacao_automatica: { type: DataTypes.BOOLEAN, allowNull: true },
+      pago_em: { type: DataTypes.DATE, allowNull: true },
+      // US15 - quem cancelou, quando, por que e qual regra valeu.
+      cancelado_em: { type: DataTypes.DATE, allowNull: true },
+      cancelado_por_id: { type: DataTypes.INTEGER, allowNull: true },
+      cancelado_papel: { type: DataTypes.STRING(12), allowNull: true },
+      motivo_cancelamento: { type: DataTypes.STRING(300), allowNull: true },
+      regra_cancelamento: { type: DataTypes.STRING(30), allowNull: true }
     }, {
       sequelize,
       tableName: 'servicos',
@@ -103,6 +121,10 @@ class Servico extends Model {
     this.belongsTo(models.Bairro, { foreignKey: 'bairro_id', as: 'bairro' });
     this.hasMany(models.Mensagem, { foreignKey: 'servico_id', as: 'mensagens', onDelete: 'RESTRICT' });
     this.hasMany(models.Pagamento, { foreignKey: 'servico_id', as: 'pagamentos', onDelete: 'RESTRICT' });
+    this.belongsTo(models.Categoria, { foreignKey: 'categoria_id', as: 'categoria' });
+    this.hasMany(models.Reagendamento, { foreignKey: 'servico_id', as: 'reagendamentos', onDelete: 'RESTRICT' });
+    this.hasMany(models.Avaliacao, { foreignKey: 'servico_id', as: 'avaliacoes', onDelete: 'RESTRICT' });
+    this.hasMany(models.HistoricoServico, { foreignKey: 'servico_id', as: 'historico', onDelete: 'RESTRICT' });
   }
 
   // US13 - horario que vale: o da proposta, quando ja existe.

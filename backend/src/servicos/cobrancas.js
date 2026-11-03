@@ -13,7 +13,7 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
-  sequelize, Servico, Pagamento, EventoWebhook, Notificacao, Usuario, Prestador
+  sequelize, Servico, Pagamento, EventoWebhook, Notificacao, Usuario, Prestador, HistoricoServico
 } = require('../models');
 const gateway = require('./gateway');
 const { enviarAvisoServico } = require('../utils/email');
@@ -205,6 +205,10 @@ async function aplicarEvento({ eventoId, tipo, cobrancaId, referencia, valor }, 
         servico.status = 'aceito';
         servico.aceito_em = agora;
         await servico.save({ transaction });
+        await HistoricoServico.create({
+          servico_id: servico.id, acao: 'pagamento_retido', status_anterior: 'orcamento_enviado', status_novo: 'aceito',
+          detalhe: 'O banco confirmou o Pix: pagamento congelado'
+        }, { transaction });
         avisos = await criarAvisos(servico, transaction);
         // Se o contratante tinha gerado outro Pix para o mesmo servico, ele
         // deixa de valer: o servico ja esta pago (evita pagar duas vezes).

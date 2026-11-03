@@ -203,3 +203,17 @@
   .ficha__separador { display: none; }
   .ficha__numeros { gap: 2px 12px; }
 }
+
+/* US24 - avaliações no cartão da busca */
+.ficha__total { color: var(--texto-suave); font-weight: 400; margin-left: 4px; }
+.ficha__avaliacoes { margin: -4px 0 14px; }
+.ficha__ver {
+  border: 0; background: none; padding: 4px 0; cursor: pointer;
+  color: var(--azul-medio); font-weight: 600; font-size: 14.5px; text-decoration: underline;
+}
+.ficha__lista { display: grid; gap: 10px; margin-top: 8px; }
+.ficha__avaliacao { padding: 10px 12px; border-radius: var(--raio); background: var(--fundo); font-size: 14.5px; }
+.ficha__avaliacao p { margin: 6px 0 0; }
+.ficha__avaliacao-topo { display: flex; align-items: center; gap: 8px; color: var(--texto-suave); font-size: 13px; }
+.ficha__resposta { color: var(--texto-suave); }
+.ficha__vazio { color: var(--texto-suave); font-size: 14px; margin: 0; }

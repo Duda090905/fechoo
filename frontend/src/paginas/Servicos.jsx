@@ -12,7 +12,7 @@ import './painel.css';
 import './servicos.css';
 
 const HORA_MS = 60 * 60 * 1000;
-const ENCERRADOS = ['concluido', 'confirmado', 'pago', 'em_disputa', 'resolvido', 'recusado', 'cancelado', 'expirado'];
+const ENCERRADOS = ['confirmado', 'pago', 'em_disputa', 'resolvido', 'recusado', 'cancelado', 'expirado'];
 
 // Grupos da lista de pedidos, na ordem em que aparecem.
 const GRUPOS = {
@@ -21,9 +21,13 @@ const GRUPOS = {
     { titulo: 'Esperando seu orçamento', filtro: (s) => s.status === 'aguardando_orcamento' },
     { titulo: 'Orçamento enviado', filtro: (s) => s.status === 'orcamento_enviado' },
     { titulo: 'Compromissos', filtro: (s) => ['aceito', 'em_execucao'].includes(s.status) },
+    // US20 - concluído, esperando o cliente confirmar (até 72 horas)
+    { titulo: 'Esperando o cliente confirmar', filtro: (s) => s.status === 'concluido' },
     { titulo: 'Encerrados', filtro: (s) => ENCERRADOS.includes(s.status) }
   ],
   contratante: [
+    // US20 - a ação do contratante vem primeiro
+    { titulo: 'Para você confirmar', filtro: (s) => s.status === 'concluido' },
     { titulo: 'Aguardando orçamento', filtro: (s) => s.status === 'aguardando_orcamento' },
     { titulo: 'Orçamento enviado', filtro: (s) => s.status === 'orcamento_enviado' },
     { titulo: 'Compromissos', filtro: (s) => ['aceito', 'em_execucao'].includes(s.status) },
@@ -178,6 +182,10 @@ export default function Servicos() {
               : 'Os orçamentos que você pediu e a sua agenda.'}
           </p>
         </div>
+        {/* US16 - quem já atendeu e "chamar de novo" */}
+        {papel === 'contratante' && (
+          <Link to="/historico" className="botao botao--secundario botao--curto">Quem já me atendeu</Link>
+        )}
       </div>
 
       {avisos.length > 0 && (

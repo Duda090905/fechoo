@@ -34,6 +34,9 @@
 .status--aceito, .status--em_execucao { background: var(--verde-fraco); color: #146B49; }
 .status--recusado, .status--cancelado, .status--expirado { background: #EEF1F6; color: var(--texto-suave); }
 .status--em_disputa { background: var(--vermelho-fraco); color: #9B2C2C; }
+/* Sprint 4 - o servico depois do aceite */
+.status--concluido { background: var(--amarelo-fraco); color: #7A5900; }
+.status--confirmado, .status--pago { background: var(--verde-fraco); color: #146B49; }
 
 /* Lista de pedidos --------------------------------------------------------- */
 .grupo { margin-bottom: 30px; }
@@ -242,3 +245,22 @@
 .avisos__item span { font-size: 14.5px; }
 .avisos__item:hover { filter: brightness(.98); }
 .avisos__acoes { display: flex; justify-content: flex-end; }
+
+/* US16 - histórico e "chamar de novo" */
+.historico { display: grid; gap: 12px; }
+.historico__item {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;
+  padding: 16px 18px; background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--raio-grande);
+}
+.historico__texto { display: grid; gap: 3px; min-width: 0; }
+.historico__numeros { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 14px; color: var(--texto-suave); }
+.historico__numeros strong { color: var(--texto); font-size: 15.5px; }
+.historico__numeros a { color: var(--azul-medio); }
+.historico__indisponivel { color: var(--texto-suave); font-size: 14px; }
+.historico__filtro { min-width: 220px; }
+.historico__filtro .campo { margin: 0; }
+@media (max-width: 640px) {
+  .historico__item { grid-template-columns: auto 1fr; }
+  .historico__acao { grid-column: 1 / -1; }
+}

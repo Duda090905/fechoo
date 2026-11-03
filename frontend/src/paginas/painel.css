@@ -95,3 +95,12 @@
   border-radius: var(--raio-total); background: var(--azul-claro); color: var(--azul-medio);
   font-weight: 600; font-size: 14px;
 }
+
+/* US21 - faixa de taxa do prestador */
+.taxa__atual { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 8px; }
+.taxa__atual strong { font-family: var(--fonte-titulo); font-size: 34px; color: var(--azul-noite); }
+.taxa__atual span { color: var(--texto-suave); font-size: 15px; }
+.taxa__faixas { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+.taxa__faixas li { display: flex; gap: 10px; padding: 8px 12px; border-radius: var(--raio); background: var(--fundo); font-size: 14.5px; color: var(--texto-suave); }
+.taxa__faixas b { min-width: 34px; color: var(--texto); }
+.taxa__faixa--atual { background: var(--verde-fraco) !important; color: #146B49 !important; }

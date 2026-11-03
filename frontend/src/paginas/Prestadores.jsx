@@ -6,12 +6,54 @@ import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
 import Avatar from '../componentes/Avatar';
 import PedirOrcamento from '../componentes/PedirOrcamento';
+import { Estrelas } from '../componentes/AndamentoServico';
 import { IconeBusca, IconeEstrela, IconeLocal, IconeSelo } from '../componentes/Icones';
 import './prestadores.css';
 
 // US09 - Busca por categoria e bairro.
 // A busca é uma frase: "Preciso de [serviço] no bairro [bairro]". Os filtros
 // ficam na URL, então dá para voltar, recarregar e compartilhar a busca.
+// US24 - o contratante vê o que outros clientes disseram antes de contratar.
+function AvaliacoesDoPrestador({ prestadorId }) {
+  const [aberto, setAberto] = useState(false);
+  const [lista, setLista] = useState(null);
+  const [erro, setErro] = useState('');
+
+  function alternar() {
+    const abrir = !aberto;
+    setAberto(abrir);
+    if (abrir && !lista) {
+      api.avaliacoesDoPrestador(prestadorId)
+        .then((d) => setLista(d.avaliacoes || []))
+        .catch((e) => setErro(e.message));
+    }
+  }
+
+  return (
+    <div className="ficha__avaliacoes">
+      <button type="button" className="ficha__ver" onClick={alternar} aria-expanded={aberto}>
+        {aberto ? 'Esconder avaliações' : 'Ver avaliações'}
+      </button>
+      {aberto && (
+        <div className="ficha__lista">
+          {erro && <p className="ficha__vazio">{erro}</p>}
+          {!erro && !lista && <p className="ficha__vazio">Carregando...</p>}
+          {lista && lista.map((a, i) => (
+            <div className="ficha__avaliacao" key={i}>
+              <div className="ficha__avaliacao-topo">
+                <Estrelas nota={a.nota} tamanho={14} />
+                <span>{a.autor} · {new Date(a.em).toLocaleDateString('pt-BR')}</span>
+              </div>
+              {a.comentario && <p>{a.comentario}</p>}
+              {a.resposta && <p className="ficha__resposta"><strong>Resposta:</strong> {a.resposta}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Prestadores() {
   const { usuario } = useAuth();
   const [parametros, setParametros] = useSearchParams();
@@ -193,6 +235,10 @@ export default function Prestadores() {
                         <IconeEstrela width="15" height="15" aria-hidden="true" />
                         {p.nota_media.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                         <span className="sr-only"> de nota média</span>
+                        {/* US24 - de quantas avaliações vem a nota */}
+                        {p.total_avaliacoes > 0 && (
+                          <span className="ficha__total">({p.total_avaliacoes} {p.total_avaliacoes === 1 ? 'avaliação' : 'avaliações'})</span>
+                        )}
                       </span>
                     ) : (
                       <span>Sem avaliações ainda</span>
@@ -208,6 +254,8 @@ export default function Prestadores() {
               </div>
 
               {p.descricao && <p className="ficha__descricao">{p.descricao}</p>}
+
+              {p.total_avaliacoes > 0 && <AvaliacoesDoPrestador prestadorId={p.id} />}
 
               <div className="ficha__categorias">
                 {p.atende_apenas_mulheres && <span className="etiqueta etiqueta--forte">Atende apenas mulheres</span>}
@@ -242,6 +290,7 @@ export default function Prestadores() {
           prestador={escolhido}
           bairros={bairros}
           bairroInicial={bairro}
+          categoriaId={categoria}
           aoFechar={() => setEscolhido(null)}
         />
       )}

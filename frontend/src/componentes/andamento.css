@@ -1,0 +1,98 @@
+/* Sprint 4 - o serviço depois do aceite (US20, US15, US14, US24). */
+
+.andamento__texto { color: var(--texto); font-size: 15.5px; margin: 0 0 16px; }
+.andamento__feito { color: #146B49; font-size: 14.5px; margin: -6px 0 16px; }
+.andamento__botoes { display: grid; gap: 10px; }
+
+.andamento__espera {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--raio);
+  background: var(--azul-claro); color: var(--azul-medio); font-size: 15px;
+}
+.andamento__espera svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* Ação do contratante: confirmar o serviço */
+.andamento__destaque {
+  display: grid; gap: 4px; margin-bottom: 16px;
+  padding: 14px 16px; border-radius: var(--raio);
+  background: var(--amarelo-fraco); border: 1px solid #F3DC9A;
+}
+.andamento__destaque strong { font-family: var(--fonte-titulo); font-size: 17px; }
+.andamento__destaque span { font-size: 15px; color: #5C4A12; }
+
+.andamento__alerta {
+  display: grid; gap: 8px; justify-items: start; margin-bottom: 16px;
+  padding: 14px 16px; border-radius: var(--raio);
+  background: var(--vermelho-fraco); color: #9B2C2C; font-size: 15px;
+}
+.andamento__alerta strong { font-family: var(--fonte-titulo); font-size: 16px; }
+
+.andamento__cancelado { color: var(--texto-suave); font-size: 15px; }
+.andamento__cancelado p { margin: 0 0 8px; }
+
+.congelado--liberado { margin-top: 0; margin-bottom: 16px; }
+
+/* US20 / US21 - comprovante do repasse */
+.repasse { border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px 16px; }
+.repasse dl { margin: 0; display: grid; gap: 8px; }
+.repasse dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.repasse dt { color: var(--texto-suave); }
+.repasse dd { margin: 0; font-variant-numeric: tabular-nums; }
+.repasse__total {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--borda);
+}
+.repasse__total strong { font-family: var(--fonte-titulo); font-size: 24px; color: var(--verde); }
+.repasse__nota { color: var(--texto-suave); font-size: 13.5px; margin: 8px 0 0; }
+
+/* US15 - cancelar */
+.cancelar-servico { margin-top: 16px; }
+.cancelar-servico__valores { margin: 12px 0 16px; display: grid; gap: 6px; }
+.cancelar-servico__valores div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; color: var(--texto); }
+.cancelar-servico__valores dd { margin: 0; font-weight: 600; }
+.cancelar-servico .campo { margin-bottom: 14px; }
+.cancelar-servico textarea, .avaliar textarea, .avaliacao__responder textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+
+/* US14 - nova data */
+.nova-data {
+  margin-top: 16px; padding: 14px 16px; border-radius: var(--raio);
+  background: #F7F8FA; border: 1px solid var(--borda); font-size: 15px;
+}
+.nova-data p { margin: 0 0 12px; }
+.nova-data__nota { color: var(--texto-suave); font-size: 14px; }
+
+/* US24 - avaliação */
+.estrelas { display: inline-flex; gap: 2px; vertical-align: middle; }
+.estrelas__cheia { color: var(--amarelo-escuro); fill: var(--amarelo); }
+.estrelas__vazia { color: var(--borda); }
+.escolher-nota { display: flex; gap: 6px; margin-bottom: 16px; }
+.escolher-nota__estrela {
+  border: 0; background: none; padding: 4px; cursor: pointer; border-radius: 8px;
+  color: var(--borda);
+}
+.escolher-nota__estrela--cheia { color: var(--amarelo-escuro); }
+.escolher-nota__estrela--cheia svg { fill: var(--amarelo); }
+.escolher-nota__estrela:focus-visible { outline: 3px solid var(--azul-medio); outline-offset: 2px; }
+.avaliar .campo { margin-bottom: 14px; }
+.avaliacao__item { padding: 14px 0; border-top: 1px solid var(--borda); display: grid; gap: 6px; justify-items: start; }
+.avaliacao__item:first-of-type { border-top: 0; padding-top: 0; }
+.avaliacao__item p { margin: 0; font-size: 15px; }
+.avaliacao__item small { color: var(--texto-suave); font-size: 13.5px; }
+.avaliacao__quem { font-family: var(--fonte-titulo); font-weight: 600; }
+.avaliacao__resposta { background: var(--fundo); padding: 10px 12px; border-radius: var(--raio); width: 100%; }
+.avaliacao__responder { width: 100%; display: grid; gap: 10px; justify-items: start; }
+
+/* Histórico do serviço */
+.linha-tempo summary { cursor: pointer; list-style: none; }
+.linha-tempo summary::-webkit-details-marker { display: none; }
+.linha-tempo summary h2 { display: inline; margin: 0; }
+.linha-tempo summary::after { content: ' +'; color: var(--texto-suave); font-size: 20px; }
+.linha-tempo[open] summary::after { content: ' −'; }
+.linha-tempo ol { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.linha-tempo li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; font-size: 14.5px; }
+.linha-tempo__quando { color: var(--texto-suave); }
+.linha-tempo__oque { display: grid; gap: 2px; }
+.linha-tempo__oque span { color: var(--texto-suave); }
+@media (max-width: 560px) {
+  .linha-tempo li { grid-template-columns: 1fr; gap: 2px; }
+}

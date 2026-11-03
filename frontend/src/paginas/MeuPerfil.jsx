@@ -79,6 +79,39 @@ function CartaoChavePix({ identidade, aoConfirmar }) {
   );
 }
 
+// US21 - a taxa cai conforme o prestador conclui mais serviços.
+function CartaoTaxa({ taxa }) {
+  if (!taxa) return null;
+  return (
+    <div className="cartao">
+      <h2>Sua taxa no Fechô</h2>
+      <p className="taxa__atual">
+        <strong>{taxa.percentual}%</strong>
+        <span>sobre o valor de cada serviço concluído. O deslocamento é todo seu.</span>
+      </p>
+      <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+        {taxa.servicos_concluidos === 1 ? '1 serviço concluído' : `${taxa.servicos_concluidos} serviços concluídos`}.{' '}
+        {taxa.proxima
+          ? `Faltam ${taxa.proxima.faltam} para a taxa cair para ${taxa.proxima.percentual}% (a partir do ${taxa.proxima.a_partir_do_servico}º serviço).`
+          : 'Você já está na menor taxa.'}
+      </p>
+      <ol className="taxa__faixas">
+        {taxa.faixas.map((f, i) => {
+          const proxima = taxa.faixas[i + 1];
+          const texto = proxima
+            ? `do ${f.a_partir_do_servico}º ao ${proxima.a_partir_do_servico - 1}º serviço`
+            : `do ${f.a_partir_do_servico}º em diante`;
+          return (
+            <li key={f.percentual} className={f.percentual === taxa.percentual ? 'taxa__faixa--atual' : ''}>
+              <b>{f.percentual}%</b> <span>{texto}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 export default function MeuPerfil() {
   const { usuario } = useAuth();
   const [areas, setAreas] = useState([]);
@@ -99,6 +132,7 @@ export default function MeuPerfil() {
   const campoArquivo = useRef(null);
   // US06
   const [identidade, setIdentidade] = useState({ verificado: false, chave_pix: null });
+  const [taxa, setTaxa] = useState(null); // US21
 
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
@@ -120,6 +154,7 @@ export default function MeuPerfil() {
           atende_apenas_mulheres: p.atende_apenas_mulheres
         };
         if (p) setIdentidade({ verificado: p.verificado, chave_pix: p.chave_pix });
+        if (p) setTaxa(p.taxa || null);
         if (p && p.categorias.length) {
           setPerfil(salvo);
           setRascunho(salvo);
@@ -329,6 +364,8 @@ export default function MeuPerfil() {
           </div>
 
           <CartaoChavePix identidade={identidade} aoConfirmar={confirmarChavePix} />
+
+          <CartaoTaxa taxa={taxa} />
 
           <div className="cartao">
             <h2>{status === 'ativo' ? 'Precisa dar uma pausa?' : 'Pronto para voltar?'}</h2>

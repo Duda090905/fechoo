@@ -79,8 +79,12 @@ export default function MinhaConta() {
   const [erro, setErro] = useState('');
   const navegar = useNavigate();
 
+  // US15 - quantos cancelamentos a pessoa já fez (fica no histórico dela).
+  const [cancelamentos, setCancelamentos] = useState(null);
+
   useEffect(() => {
     api.pendencias().then((d) => setPendencias(d.pendencias || [])).catch(() => setPendencias([]));
+    api.minhaConta().then((d) => setCancelamentos(d.usuario?.cancelamentos ?? null)).catch(() => {});
   }, []);
 
   async function reativar() {
@@ -163,6 +167,12 @@ export default function MinhaConta() {
               {usuario?.tipo_perfil === 'prestador' ? 'Prestador de serviço' : 'Contratante'}
             </span>
           </div>
+          {cancelamentos !== null && (
+            <div className="dado">
+              <span className="dado__rotulo">Serviços que você cancelou</span>
+              <span className="dado__valor">{cancelamentos}</span>
+            </div>
+          )}
         </div>
       </div>
       {!inativa && <TrocarSenha />}

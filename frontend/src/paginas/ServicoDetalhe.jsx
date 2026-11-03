@@ -7,6 +7,9 @@ import Campo from '../componentes/Campo';
 import Chat from '../componentes/Chat';
 import ImagemProtegida from '../componentes/ImagemProtegida';
 import PagamentoPix from '../componentes/PagamentoPix';
+import {
+  Andamento, Avaliacao, Cancelamento, LinhaDoTempo, NovaData
+} from '../componentes/AndamentoServico';
 import { EtiquetaStatus } from './Servicos';
 import { IconeCadeado, IconeCalendario, IconeLocal, IconeVoltar } from '../componentes/Icones';
 import {
@@ -207,6 +210,8 @@ function FormularioAceite({ servico, aoAceitar, aoVoltar }) {
 function PagamentoCongelado({ servico, papel }) {
   const { pagamento } = servico;
   if (!pagamento || pagamento.status !== 'retido') return null;
+  // Sprint 4 - depois da confirmação, quem fala do dinheiro é o Andamento.
+  if (!['aceito', 'em_execucao', 'concluido'].includes(servico.status)) return null;
   const nome = ((papel === 'prestador' ? servico.contratante?.nome : servico.prestador?.nome) || '').split(' ')[0];
   return (
     <div className="congelado" role="status">
@@ -235,11 +240,17 @@ export default function ServicoDetalhe() {
   const [aceitando, setAceitando] = useState(false);
   const statusAnterior = useRef(null);
 
-  const carregar = useCallback(() => {
-    api.servico(id)
-      .then((d) => { setServico(d.servico); setErro(''); })
-      .catch((e) => setErro(e.message));
-  }, [id]);
+  const carregar = useCallback(() => api.servico(id)
+    .then((d) => { setServico(d.servico); setErro(''); })
+    .catch((e) => setErro(e.message)), [id]);
+
+  // Sprint 4 - depois de cada ação (iniciar, confirmar, cancelar, nova data,
+  // avaliar), recarrega o serviço e mostra a mensagem da API.
+  const aoAtualizar = useCallback(async (texto) => {
+    await carregar();
+    setMensagem(texto || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [carregar]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -339,11 +350,13 @@ export default function ServicoDetalhe() {
                   <IconeLocal width="18" height="18" aria-hidden="true" />
                   <span>
                     <strong>{servico.endereco.logradouro}</strong>
-                    <small>
-                      {papel === 'prestador'
-                        ? 'Endereço liberado porque o pagamento está congelado.'
-                        : `Visível para ${primeiroNome} porque o pagamento está congelado.`}
-                    </small>
+                    {['aceito', 'em_execucao', 'concluido'].includes(servico.status) && (
+                      <small>
+                        {papel === 'prestador'
+                          ? 'Endereço liberado porque o pagamento está congelado.'
+                          : `Visível para ${primeiroNome} porque o pagamento está congelado.`}
+                      </small>
+                    )}
                   </span>
                 </li>
               ) : papel === 'prestador' && ['aguardando_orcamento', 'orcamento_enviado'].includes(servico.status) && (
@@ -445,7 +458,23 @@ export default function ServicoDetalhe() {
             )}
 
             <PagamentoCongelado servico={servico} papel={papel} />
+
+            {/* US15 - cancelar antes do aceite (sem dinheiro envolvido) */}
+            {['aguardando_orcamento', 'orcamento_enviado'].includes(servico.status) && !aceitando && !confirmarRecusa && (
+              <Cancelamento servico={servico} aoAtualizar={aoAtualizar} />
+            )}
           </section>
+
+          {/* US20 - andamento; US14 - nova data; US15 - cancelar depois do aceite */}
+          <Andamento servico={servico} aoAtualizar={aoAtualizar}>
+            <NovaData servico={servico} aoAtualizar={aoAtualizar} />
+            <Cancelamento servico={servico} aoAtualizar={aoAtualizar} />
+          </Andamento>
+
+          {/* US24 - avaliação mútua */}
+          <Avaliacao key={`${servico.id}-${servico.avaliacoes?.minha?.nota || 0}`} servico={servico} aoAtualizar={aoAtualizar} />
+
+          <LinhaDoTempo historico={servico.historico} />
         </div>
 
         <Chat servicoId={servico.id} aberto={servico.chat_aberto} outraParte={outra} aoMudarStatus={carregar} />

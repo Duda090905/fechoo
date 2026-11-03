@@ -16,13 +16,16 @@ const LIMITE_FOTO_MB = 2;
 
 // US10 - pedido de orçamento, com fotos. US13 - com data e hora.
 // Abre por cima da busca: no celular sobe de baixo, no computador vem da lateral.
-export default function PedirOrcamento({ prestador, bairros, bairroInicial, aoFechar }) {
+// US16 - "chamar de novo": abre já com a descrição e a categoria do serviço anterior.
+export default function PedirOrcamento({
+  prestador, bairros, bairroInicial, categoriaId, descricaoInicial = '', aoFechar
+}) {
   const { usuario } = useAuth();
   const navegar = useNavigate();
   const primeiroCampo = useRef(null);
   const campoArquivo = useRef(null);
 
-  const [descricao, setDescricao] = useState('');
+  const [descricao, setDescricao] = useState(descricaoInicial);
   const [bairro, setBairro] = useState(bairroInicial || '');
   const [dataHora, setDataHora] = useState('');
   const [fotos, setFotos] = useState([]); // { arquivo, previa }
@@ -87,6 +90,12 @@ export default function PedirOrcamento({ prestador, bairros, bairroInicial, aoFe
     form.append('descricao', descricao.trim());
     form.append('bairro_id', bairro);
     form.append('data_hora', iso);
+    // US16 - a categoria vai junto (vem do filtro da busca ou do histórico);
+    // com uma categoria só, o perfil já diz qual é.
+    const categoria = categoriaId || (prestador.categorias?.length === 1 ? prestador.categorias[0].id : null);
+    if (categoria && prestador.categorias?.some((c) => String(c.id) === String(categoria))) {
+      form.append('categoria_id', categoria);
+    }
     fotos.forEach((f) => form.append('fotos', f.arquivo));
 
     setEnviando(true);

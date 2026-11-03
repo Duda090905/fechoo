@@ -115,6 +115,25 @@ export const api = {
   // US11 / US17 - aceitar o orçamento gera o Pix
   aceitarOrcamento: (id, corpo) => requisitar(`/servicos/${id}/aceitar`, { metodo: 'POST', corpo, autenticado: true }),
 
+  // US20 - Cheguei, iniciar, concluir e confirmar
+  cheguei: (id) => requisitar(`/servicos/${id}/cheguei`, { metodo: 'POST', autenticado: true }),
+  iniciarServico: (id) => requisitar(`/servicos/${id}/iniciar`, { metodo: 'POST', autenticado: true }),
+  concluirServico: (id) => requisitar(`/servicos/${id}/concluir`, { metodo: 'POST', autenticado: true }),
+  confirmarServico: (id) => requisitar(`/servicos/${id}/confirmar`, { metodo: 'POST', autenticado: true }),
+  // US15 - quanto cada um recebe e o cancelamento
+  previaCancelamento: (id) => requisitar(`/servicos/${id}/cancelamento`, { autenticado: true }),
+  cancelarServico: (id, corpo) => requisitar(`/servicos/${id}/cancelar`, { metodo: 'POST', corpo, autenticado: true }),
+  // US14 - nova data
+  proporNovaData: (id, corpo) => requisitar(`/servicos/${id}/reagendamentos`, { metodo: 'POST', corpo, autenticado: true }),
+  responderNovaData: (id, rid, aceitar) => requisitar(`/servicos/${id}/reagendamentos/${rid}/responder`, { metodo: 'POST', corpo: { aceitar }, autenticado: true }),
+  // US24 - avaliacao
+  avaliar: (id, corpo) => requisitar(`/servicos/${id}/avaliacao`, { metodo: 'POST', corpo, autenticado: true }),
+  editarAvaliacao: (id, corpo) => requisitar(`/servicos/${id}/avaliacao`, { metodo: 'PUT', corpo, autenticado: true }),
+  responderAvaliacao: (id, texto) => requisitar(`/servicos/${id}/avaliacao/resposta`, { metodo: 'POST', corpo: { texto }, autenticado: true }),
+  avaliacoesDoPrestador: (id) => requisitar(`/prestadores/${id}/avaliacoes`),
+  // US16 - historico
+  historico: (categoria) => requisitar(`/servicos/historico${categoria ? `?categoria=${categoria}` : ''}`, { autenticado: true }),
+
   // US11 / US18 - avisos
   notificacoes: () => requisitar('/notificacoes', { autenticado: true }),
   marcarNotificacoesLidas: () => requisitar('/notificacoes/lidas', { metodo: 'POST', autenticado: true }),

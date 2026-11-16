@@ -4,7 +4,7 @@ Cada linha do "O que será feito" e cada critério de aceite dos cartões US20, 
 
 **Antes de começar**
 
-1. `cd backend && npm run teste` → esperado: **320 critérios, 0 falhas**.
+1. `cd backend && npm run teste` → esperado: **325 critérios, 0 falhas**.
 2. `npm run db:demo -- --recriar` (as datas partem de agora: o serviço da Rita fica marcado para daqui a 30 minutos) e `npm run dev`; no front, `npm run dev`.
 3. Contas de demonstração, todas com a senha `demo1234`:
 
@@ -30,7 +30,7 @@ Cada linha do "O que será feito" e cada critério de aceite dos cartões US20, 
 | **Critério:** a confirmação libera o valor descontada a taxa | idem | idem |
 | **Critério:** sem confirmação no prazo, libera sozinho | idem | idem |
 | **Critério:** o prestador não libera o próprio pagamento | "o prestador nao consegue liberar o proprio pagamento sozinho" | O prestador não tem botão de confirmar; a API responde 403 |
-| **Critério:** a taxa fica registrada e consultável por serviço | "o valor da taxa fica registrado e consultavel por servico" | Rita → serviço pago: quadro com a taxa e o valor recebido |
+| **Critério:** a taxa fica registrada e consultável por serviço | "o valor da taxa fica registrado e consultavel por servico" | Rita → torneira (depois de paga): **Comprovante do pagamento** com Pix pago, taxa, valor recebido, chave Pix mascarada, data e código da transferência. Teste: "comprovante do prestador..." e "comprovante do cliente..." |
 
 ## US24 — Avaliação mútua · 8 pontos
 
@@ -39,7 +39,7 @@ Cada linha do "O que será feito" e cada critério de aceite dos cartões US20, 
 | Tabela Avaliacoes com nota e comentário, para os dois lados | "o prestador avalia o cliente (avaliacao mutua)" | Ana e Joao → pintura do portão → Avaliação |
 | Liberar só depois das duas, ou no fim do prazo (7 dias) | "a avaliacao de um lado nao aparece antes..."; "vencido o prazo de 7 dias..." | Ana avalia: "aparece quando Joao avaliar"; Joao avalia: as duas aparecem |
 | Edição em até 24 horas e resposta do prestador | "nas primeiras 24 horas a avaliacao pode ser editada"; "o prestador responde (uma vez)" | Botão Editar avaliação; campo Responder |
-| Média (simples) e consequências só com 5 avaliações | "a nota do prestador e a media simples..."; "prestador com menos de 5 avaliacoes nao sofre queda" | Busca: Rita 4,6 (8 avaliações) antes de Eli 4,0 (1 avaliação: não conta na ordem) |
+| Média com peso maior para os últimos 10 serviços e consequências só com 5 avaliações | "a media da peso maior para os ultimos 10 servicos (... 4,64; simples daria 4,33)"; "com ate 10 avaliacoes, todas sao recentes..."; "prestador com menos de 5 avaliacoes nao sofre queda" | Busca: Rita 4,6 (8 avaliações) antes de Eli 4,0 (1 avaliação: não conta na ordem) |
 | **Critério:** só quem contratou e teve o serviço confirmado avalia | "so quem teve o servico confirmado consegue avaliar"; "quem nao contratou nao avalia" | Em serviço aceito não aparece o quadro de avaliação |
 | **Critério:** a avaliação de um lado não aparece antes da outra | idem | idem |
 | **Critério:** depois de 24 horas, não edita mais | "apos 24 horas, a avaliacao nao pode mais ser editada" | O botão Editar some depois do horário mostrado |
@@ -52,7 +52,7 @@ Cada linha do "O que será feito" e cada critério de aceite dos cartões US20, 
 | --- | --- | --- |
 | Cancelamento com motivo e quem cancelou | "o cancelamento exige o motivo"; "o cancelamento registra o motivo e quem cancelou" | Botão Cancelar serviço → motivo |
 | Regra pela antecedência (tabela do grupo) | "fora do prazo (menos de 24 horas)..."; "com o prestador no local, ... 50% / 50%"; "quando o prestador cancela, o cliente recebe 100%" | Ana → Vazamento (amanhã): prévia 70% R$ 98 / 30% R$ 42 |
-| Estorno no gateway e status do pagamento | "cancelamento dentro do prazo (mais de 24 horas) gera estorno integral" | Bruno → Ventilador: devolvidos R$ 175 |
+| Estorno no gateway e status do pagamento | "cancelamento dentro do prazo (mais de 24 horas) gera estorno integral" | Bruno → Ventilador: comprovante com o selo **Estornado**, R$ 175 devolvidos e o código da devolução. Teste: "comprovante do estorno..." |
 | Contabilizar cancelamentos no histórico do usuário | "os cancelamentos ficam contados no historico de quem cancelou" | Minha conta → Serviços que você cancelou |
 | **Critério:** dentro do prazo, estorno integral | idem | idem |
 | **Critério:** fora do prazo, aplica a regra e informa o valor | "antes de cancelar, o sistema informa quanto cada um recebe" | A prévia aparece antes de confirmar |

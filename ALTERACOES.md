@@ -752,7 +752,7 @@ Branch `Sprint-4`, criada a partir da `Sprint-3`. Testes: `npm run teste` passa 
 
 1. **A taxa vale só sobre o valor do serviço.** O deslocamento é gasto do prestador e vai inteiro para ele. Exemplo: R$ 200 de serviço + R$ 20 de deslocamento = R$ 220 pagos; taxa 8% × 200 = R$ 16; prestador recebe 220 − 16 = R$ 204.
 2. **Botão "Cheguei" para a regra 50/50.** O prestador avisa que chegou; a partir daí, o cancelamento do cliente divide o valor ao meio. Cheguei e Iniciar só funcionam a partir de 1 hora antes do horário combinado (para ninguém "chegar" dias antes nem iniciar cedo e impedir o cancelamento).
-3. **Média simples na US24.** O card fala em "peso maior para os últimos 10 serviços"; o grupo preferiu a média simples.
+3. **Média da US24 segue o card** (corrigido em 16/11): as avaliações dos 10 serviços mais recentes valem 2 e as mais antigas valem 1. Com 10 avaliações ou menos, dá o mesmo que a média simples.
 4. **Prazo para avaliar: 7 dias** depois da confirmação. Vencido, a avaliação que existir é publicada sozinha.
 5. **Reagendamento: até 3 por serviço, proposto por qualquer uma das partes.**
 6. **"Iniciar serviço" entra na US20.** A máquina de estados exige Aceito → Em execução, e nenhum card tinha esse botão.
@@ -766,7 +766,7 @@ Branch `Sprint-4`, criada a partir da `Sprint-3`. Testes: `npm run teste` passa 
 | US21 | "Implementar a regra de 8%..." | Acrescentar: "A taxa incide **só sobre o valor do serviço**; a taxa de deslocamento vai inteira para o prestador." |
 | US15 | "Aplicar a regra de estorno conforme a antecedência definida no escopo" | Escrever a tabela: mais de 24 h = 100/0; menos de 24 h = 70/30; prestador no local (botão Cheguei) = 50/50; prestador cancela = 100/0. Critério novo: "Com o serviço em execução não existe cancelamento, só disputa." |
 | US14 | "Limitar a quantidade de reagendamentos por serviço" | "...a **3** reagendamentos por serviço". História: "Como prestador **ou contratante**..." |
-| US24 | "Calcular a média com peso maior para os últimos 10 serviços" | "Calcular a **média simples** das avaliações publicadas". "Liberar as avaliações após ambas serem enviadas ou vencer o prazo **de 7 dias** após a confirmação". |
+| US24 | "Calcular a média com peso maior para os últimos 10 serviços" | "...com **peso 2** para os últimos 10 serviços e **peso 1** para os anteriores". "Liberar as avaliações após ambas serem enviadas ou vencer o prazo **de 7 dias** após a confirmação". |
 | US16 | "Permitir filtrar o histórico por categoria" | Sem mudança no card; registrar que o pedido (US10) passou a guardar a categoria. |
 
 ### O que mudou
@@ -781,7 +781,7 @@ Branch `Sprint-4`, criada a partir da `Sprint-3`. Testes: `npm run teste` passa 
 - `servicos/repasse.js` (US20/US21): confirmar, calcular a taxa, conferir a chave e transferir; rotina de 5 em 5 minutos (72 horas, repasses pendentes, avaliações vencidas).
 - `servicos/taxa.js` (US21): faixas 8/6/5, contagem de concluídos (Confirmado e Pago; cancelado e em disputa não contam) e a faixa para o painel.
 - `servicos/cancelamento.js` (US15): prévia e cancelamento; estorno primeiro (se o banco recusar, nada muda); multa sem taxa para o prestador.
-- `servicos/avaliacoes.js` (US24): publicação, média simples e regra das 5 avaliações.
+- `servicos/avaliacoes.js` (US24): publicação, média com peso (2 para os últimos 10 serviços) e regra das 5 avaliações.
 - `controllers/execucaoController.js`: Cheguei, iniciar, concluir, confirmar, prévia e cancelamento, propor e responder nova data.
 - `controllers/avaliacaoController.js`: avaliar, editar, responder e a lista pública de cada prestador.
 - `servicoController.historico` (US16) e o detalhe do serviço com reagendamentos, histórico e avaliações.
@@ -802,6 +802,15 @@ Branch `Sprint-4`, criada a partir da `Sprint-3`. Testes: `npm run teste` passa 
 
 ### Como conferir
 
-1. `npm run teste` → 320 critérios, 0 falhas.
+1. `npm run teste` → 325 critérios, 0 falhas (320 da entrega de 03/11 + 5 dos ajustes de 16/11).
 2. `Checklist Sprint 4 Fechô.md`: cada item do "O que será feito" e cada critério dos 6 cards, com o teste e o passo na tela.
+
+### Ajustes de 16/11 (conferência card por card)
+
+| O que | Card | Por quê | Teste novo |
+|---|---|---|---|
+| Média com peso: as avaliações dos 10 serviços mais recentes valem 2, as anteriores valem 1 | US24 | O card pede "peso maior para os últimos 10 serviços"; a entrega de 03/11 usava a média simples | "a media da peso maior para os ultimos 10 servicos" (10 notas 5 recentes e 2 notas 1 antigas: (10 × 5 × 2 + 2 × 1 × 1) ÷ 22 = **4,64**; a simples daria 52 ÷ 12 = 4,33) e "a ordem vale pela data do servico" (10 notas 1 recentes e 2 notas 5 antigas: 30 ÷ 22 = **1,36**) |
+| Comprovante do pagamento na tela do serviço: Pix pago, taxa e valor recebido (prestador), situação (cliente), valor devolvido e parte do profissional no cancelamento, data, código da transferência ou da devolução e banco | US20 ("o valor da taxa fica registrado e consultável por serviço") e US15 ("atualizar o status do pagamento") | No modo simulado, o repasse e o estorno só apareciam no console do servidor | "comprovante do prestador...", "comprovante do cliente..." (sem chave Pix nem taxa) e "comprovante do estorno..." |
+
+Na API, o pagamento do detalhe do serviço ganhou `transferencia` (código e data), `estorno.id`, `gateway` e, só para o prestador, `repasse.chave` (mascarada, como na US06). Nada muda no banco.
 

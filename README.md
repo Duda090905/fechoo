@@ -7,7 +7,7 @@ Plataforma de contratação de serviços com pagamento retido. Este repositório
 | Nº | História | Nota | O que entrega |
 |---|---|---|---|
 | US20 | Conclusão do serviço e repasse | 13 | Prestador inicia e marca como concluído; cliente confirma; o Pix vai para a chave do prestador já sem a taxa; sem resposta em 72 horas, confirma sozinho |
-| US24 | Avaliação mútua | 8 | Nota de 1 a 5 dos dois lados, publicadas juntas (ou em 7 dias); edição em 24 horas; resposta do prestador; média simples; a nota só muda a busca a partir de 5 avaliações |
+| US24 | Avaliação mútua | 8 | Nota de 1 a 5 dos dois lados, publicadas juntas (ou em 7 dias); edição em 24 horas; resposta do prestador; média com peso 2 para os 10 serviços mais recentes; a nota só muda a busca a partir de 5 avaliações |
 | US15 | Cancelamento e estorno | 5 | Prévia de quanto cada um recebe e cancelamento com estorno: mais de 24 h = 100/0; menos de 24 h = 70/30; prestador no local (Cheguei) = 50/50; prestador cancela = 100/0 |
 | US21 | Taxa decrescente por volume | 3 | 8% até o 20º serviço, 6% do 21º ao 50º, 5% a partir do 51º, só sobre o valor do serviço; faixa no Meu perfil |
 | US14 | Reagendamento | 3 | Qualquer parte pede nova data; só vale com o aceite da outra; até 3 por serviço; o pagamento continua congelado |
@@ -17,7 +17,7 @@ Total: 13 + 8 + 5 + 3 + 3 + 3 = **35 pontos**. O que mudou, as decisões e os te
 
 **Caminho do serviço.** Aceito → (Cheguei) → Em execução → Concluído pelo prestador → Confirmado → Pago. Só o prestador inicia e conclui; só o cliente confirma. Na confirmação, a API calcula a taxa, confere se a chave Pix é do CPF do cadastro e manda o gateway transferir. Sem chave conferida, o serviço fica Confirmado com o repasse pendente, que sai sozinho quando o prestador cadastra a chave. A rotina que roda a cada 5 minutos confirma o que passou de 72 horas, tenta de novo os repasses pendentes e publica as avaliações vencidas.
 
-**Gateway.** O Asaas faz o repasse por `POST /transfers` (Pix para a chave CPF) e o estorno por `POST /payments/{id}/refund`. No modo simulado, os dois só aparecem no console. Ainda não foram testados no sandbox de verdade: faça isso antes da apresentação.
+**Gateway.** O Asaas faz o repasse por `POST /transfers` (Pix para a chave CPF) e o estorno por `POST /payments/{id}/refund`. Nos dois modos, a tela do serviço mostra o **comprovante do pagamento**: o Pix pago, a taxa e o valor recebido (para o prestador), o valor devolvido no cancelamento, a data, o código da transferência ou da devolução e o banco (simulação ou Asaas sandbox). Repasse e estorno ainda não foram testados no sandbox de verdade: faça isso antes da apresentação.
 
 ### Sprint 3
 

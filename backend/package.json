@@ -1,7 +1,7 @@
 {
   "name": "fecho-backend",
   "version": "1.0.0",
-  "description": "Fecho - API dos Sprints 1, 2 e 3",
+  "description": "Fecho - API dos Sprints 1 a 4",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
@@ -10,6 +10,7 @@
     "db:seed": "node src/database/seed.js",
     "db:demo": "node src/database/demo.js",
     "pix:pagar": "node scripts/pix-pagar.js",
+    "asaas:saldo": "node scripts/asaas-saldo.js",
     "teste": "node testes/criterios.js"
   },
   "dependencies": {

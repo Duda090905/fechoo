@@ -118,21 +118,78 @@ async function confirmarNoSandbox(cobrancaId) {
 /**
  * US20 / US15 - transfere por Pix da conta do Fechô no Asaas para a chave do
  * prestador (repasse do servico ou multa de cancelamento).
- *   POST /transfers  { value, pixAddressKey, pixAddressKeyType, description }
- * No MVP a chave e sempre do tipo CPF (US06).
+ *   POST /transfers  { value, operationType, pixAddressKey, pixAddressKeyType, description }
+ * No MVP a chave e sempre o CPF do prestador (US06).
+ *
+ * Sandbox: um CPF inventado nao existe como chave Pix no ambiente de testes,
+ * e a transferencia seria recusada. O Asaas oferece chaves de homologacao do
+ * Banco Central (ex.: cliente-a00001@pix.bcb.gov.br): a transferencia sai e
+ * debita o saldo, mas nao credita ninguem. ASAAS_CHAVE_PIX_TESTE escolhe
+ * essa chave; o padrao e a primeira da lista. Com ASAAS_CHAVE_PIX_TESTE=cpf,
+ * vai para o CPF do prestador (so funciona se ele for chave de outra conta
+ * sandbox). A conferencia do CPF (US06 / US20) acontece antes, no Fechô.
  */
+const CHAVE_TESTE_PADRAO = 'cliente-a00001@pix.bcb.gov.br';
+
+function tipoDaChave(chave) {
+  if (chave.includes('@')) return 'EMAIL';
+  if (/^\d{11}$/.test(chave)) return 'CPF';
+  if (/^\d{14}$/.test(chave)) return 'CNPJ';
+  if (/^\+?\d{10,13}$/.test(chave)) return 'PHONE';
+  return 'EVP';
+}
+
+function chaveDeDestino(chaveDoPrestador) {
+  const teste = (process.env.ASAAS_CHAVE_PIX_TESTE ?? CHAVE_TESTE_PADRAO).trim();
+  if (!teste || teste.toLowerCase() === 'cpf') return chaveDoPrestador;
+  return teste;
+}
+
 async function transferirPix({ valor, chave, descricao }) {
+  const destino = chaveDeDestino(chave);
   const transferencia = await chamar('/transfers', {
     metodo: 'POST',
     corpo: {
       value: valor,
       operationType: 'PIX',
-      pixAddressKey: chave,
-      pixAddressKeyType: 'CPF',
+      pixAddressKey: destino,
+      pixAddressKeyType: tipoDaChave(destino),
       description: descricao.slice(0, 140)
     }
   });
+  if (transferencia.status && transferencia.status !== 'DONE') {
+    // Ex.: PENDING esperando a confirmacao de seguranca (no sandbox, token 000000).
+    console.log(`[pagamento] (asaas) transferencia ${transferencia.id} criada com status ${transferencia.status}`);
+  }
   return { transferencia_id: transferencia.id };
+}
+
+/**
+ * Sandbox: coloca saldo de teste na conta (o estorno e a transferencia
+ * precisam de saldo). Cria um cliente ficticio, uma cobranca Pix e pede ao
+ * Asaas que a considere paga. Usado pelo npm run asaas:saldo.
+ */
+async function adicionarSaldoNoSandbox(valor) {
+  const cliente = await chamar('/customers', {
+    metodo: 'POST',
+    corpo: {
+      name: 'Saldo de teste Fecho', cpfCnpj: '24971563792', externalReference: 'fecho-saldo-teste', notificationDisabled: true
+    }
+  });
+  const cobranca = await chamar('/payments', {
+    metodo: 'POST',
+    corpo: {
+      customer: cliente.id, billingType: 'PIX', value: valor, dueDate: hojeEmCampinas(),
+      description: 'Fechô - saldo para testes no sandbox', externalReference: 'fecho-saldo-teste'
+    }
+  });
+  await confirmarNoSandbox(cobranca.id);
+  return cobranca.id;
+}
+
+async function consultarSaldo() {
+  const dados = await chamar('/finance/balance');
+  return dados.balance;
 }
 
 /**
@@ -148,5 +205,6 @@ async function estornarCobranca(cobrancaId, { valor, descricao }) {
 }
 
 module.exports = {
-  criarCobrancaPix, cancelarCobranca, confirmarNoSandbox, transferirPix, estornarCobranca, GatewayErro, urlBase
+  criarCobrancaPix, cancelarCobranca, confirmarNoSandbox, transferirPix, estornarCobranca, GatewayErro, urlBase,
+  adicionarSaldoNoSandbox, consultarSaldo, chaveDeDestino, tipoDaChave
 };

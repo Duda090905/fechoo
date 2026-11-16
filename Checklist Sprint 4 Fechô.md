@@ -4,7 +4,7 @@ Cada linha do "O que será feito" e cada critério de aceite dos cartões US20, 
 
 **Antes de começar**
 
-1. `cd backend && npm run teste` → esperado: **325 critérios, 0 falhas**.
+1. `cd backend && npm run teste` → esperado: **326 critérios, 0 falhas**.
 2. `npm run db:demo -- --recriar` (as datas partem de agora: o serviço da Rita fica marcado para daqui a 30 minutos) e `npm run dev`; no front, `npm run dev`.
 3. Contas de demonstração, todas com a senha `demo1234`:
 
@@ -98,4 +98,4 @@ Cada linha do "O que será feito" e cada critério de aceite dos cartões US20, 
 
 ## Ainda não existe (Sprint 5)
 
-Disputa (US23) e decisão do administrador (US25). Repasse e estorno no Asaas de verdade: testar no sandbox antes da apresentação.
+Disputa (US23) e decisão do administrador (US25). Repasse e estorno no Asaas de verdade: `GUIA-TESTE-ASAAS.md`.

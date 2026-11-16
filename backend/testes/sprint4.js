@@ -191,6 +191,18 @@ async function testarSprint4({ chamar, checar, base, bairro, idsCategorias, terc
   checar('ao cadastrar a chave no proprio CPF, o repasse pendente sai na hora',
     (await Servico.findByPk(idEdu)).status === 'pago' && (await pagamentoDe(idEdu)).status === 'liberado');
 
+  // Asaas sandbox: o CPF inventado do prestador nao existe como chave Pix la.
+  const asaas = require('../src/servicos/gateway/asaas');
+  const chaveAntes = process.env.ASAAS_CHAVE_PIX_TESTE;
+  delete process.env.ASAAS_CHAVE_PIX_TESTE;
+  const padrao = asaas.chaveDeDestino('12345678909');
+  process.env.ASAAS_CHAVE_PIX_TESTE = 'cpf';
+  const comCpf = asaas.chaveDeDestino('12345678909');
+  if (chaveAntes === undefined) delete process.env.ASAAS_CHAVE_PIX_TESTE; else process.env.ASAAS_CHAVE_PIX_TESTE = chaveAntes;
+  checar('no Asaas sandbox, o repasse vai para a chave de teste do Banco Central (o CPF do prestador so com ASAAS_CHAVE_PIX_TESTE=cpf)',
+    padrao === 'cliente-a00001@pix.bcb.gov.br' && asaas.tipoDaChave(padrao) === 'EMAIL'
+    && comCpf === '12345678909' && asaas.tipoDaChave(comCpf) === 'CPF');
+
   // =====================================================================
   console.log('\nUS21 - Taxa decrescente por volume');
 

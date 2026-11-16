@@ -17,7 +17,7 @@ Total: 13 + 8 + 5 + 3 + 3 + 3 = **35 pontos**. O que mudou, as decisões e os te
 
 **Caminho do serviço.** Aceito → (Cheguei) → Em execução → Concluído pelo prestador → Confirmado → Pago. Só o prestador inicia e conclui; só o cliente confirma. Na confirmação, a API calcula a taxa, confere se a chave Pix é do CPF do cadastro e manda o gateway transferir. Sem chave conferida, o serviço fica Confirmado com o repasse pendente, que sai sozinho quando o prestador cadastra a chave. A rotina que roda a cada 5 minutos confirma o que passou de 72 horas, tenta de novo os repasses pendentes e publica as avaliações vencidas.
 
-**Gateway.** O Asaas faz o repasse por `POST /transfers` (Pix para a chave CPF) e o estorno por `POST /payments/{id}/refund`. Nos dois modos, a tela do serviço mostra o **comprovante do pagamento**: o Pix pago, a taxa e o valor recebido (para o prestador), o valor devolvido no cancelamento, a data, o código da transferência ou da devolução e o banco (simulação ou Asaas sandbox). Repasse e estorno ainda não foram testados no sandbox de verdade: faça isso antes da apresentação.
+**Gateway.** O Asaas faz o repasse por `POST /transfers` (Pix para a chave CPF) e o estorno por `POST /payments/{id}/refund`. Nos dois modos, a tela do serviço mostra o **comprovante do pagamento**: o Pix pago, a taxa e o valor recebido (para o prestador), o valor devolvido no cancelamento, a data, o código da transferência ou da devolução e o banco (simulação ou Asaas sandbox). Para testar repasse e estorno no sandbox de verdade, siga o `GUIA-TESTE-ASAAS.md`.
 
 ### Sprint 3
 

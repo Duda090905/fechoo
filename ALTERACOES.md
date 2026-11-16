@@ -814,3 +814,11 @@ Branch `Sprint-4`, criada a partir da `Sprint-3`. Testes: `npm run teste` passa 
 
 Na API, o pagamento do detalhe do serviço ganhou `transferencia` (código e data), `estorno.id`, `gateway` e, só para o prestador, `repasse.chave` (mascarada, como na US06). Nada muda no banco.
 
+### Teste no Asaas sandbox (16/11)
+
+Para mostrar no painel do Asaas o que a US15 ("disparar o estorno **no gateway**") e a US20 ("disparar a transferência") pedem. Passo a passo no `GUIA-TESTE-ASAAS.md`.
+
+- **Transferência no sandbox:** um CPF inventado não existe como chave Pix no sandbox. No modo `asaas`, o repasse vai para a chave de homologação do Banco Central `cliente-a00001@pix.bcb.gov.br` (debita o saldo, não credita ninguém). A conferência do CPF da chave (US06 / US20) continua acontecendo antes, no Fechô. `ASAAS_CHAVE_PIX_TESTE=cpf` volta a mandar para o CPF do prestador.
+- **`npm run asaas:saldo`:** cria uma cobrança de teste de R$ 1.000 e marca como paga no sandbox. A transferência e o estorno saem do saldo da conta.
+- Teste novo: "no Asaas sandbox, o repasse vai para a chave de teste do Banco Central". `npm run teste`: **326 critérios**, 0 falhas.
+

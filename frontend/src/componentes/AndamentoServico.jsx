@@ -48,23 +48,105 @@ function useAcao(aoAtualizar) {
   return { carregando, erro, executar, setErro };
 }
 
-// US20 / US21 - quanto o prestador recebeu, com a taxa separada.
-function ComprovanteRepasse({ pagamento }) {
-  const { repasse } = pagamento;
+// Qual "banco" fez o movimento. Nos dois casos não há dinheiro de verdade.
+const BANCOS = {
+  simulado: 'Simulação do Fechô (sem dinheiro de verdade)',
+  asaas: 'Asaas, ambiente de teste (sem dinheiro de verdade)'
+};
+
+function Linha({ rotulo, children, destaque = false }) {
   return (
-    <div className="repasse">
-      <dl>
-        <div><dt>Pago pelo cliente</dt><dd>{formatarDinheiro(pagamento.valor)}</dd></div>
-        <div>
-          <dt>Taxa do Fechô ({repasse.taxa_percentual.toLocaleString('pt-BR')}% do serviço)</dt>
-          <dd>− {formatarDinheiro(repasse.taxa)}</dd>
-        </div>
-      </dl>
-      <div className="repasse__total">
-        <span>{repasse.liberado_em ? 'Você recebeu' : 'Você vai receber'}</span>
-        <strong>{formatarDinheiro(repasse.valor)}</strong>
+    <div className={destaque ? 'recibo__linha recibo__linha--destaque' : 'recibo__linha'}>
+      <dt>{rotulo}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+function porcento(parte, total) {
+  return total ? Math.round((parte / total) * 100) : 0;
+}
+
+// US20 / US21 / US15 - comprovante do dinheiro: para onde foi, quanto, quando
+// e com qual código o banco registrou. O prestador vê a taxa e a chave Pix
+// dele; o cliente vê o que pagou e o que voltou.
+export function Comprovante({ servico }) {
+  const { pagamento, papel } = servico;
+  if (!pagamento || !['retido', 'liberado', 'estornado'].includes(pagamento.status)) return null;
+  const ehPrestador = papel === 'prestador';
+  const nome = nomeDaOutraParte(servico);
+  const { repasse, transferencia, estorno } = pagamento;
+  const estornado = pagamento.status === 'estornado';
+  const pendente = repasse?.pendente;
+
+  // Só depois da confirmação (repasse) ou do cancelamento (estorno).
+  if (!estornado && !['confirmado', 'pago'].includes(servico.status)) return null;
+
+  let selo;
+  if (estornado) selo = { texto: 'Estornado', classe: 'estornado' };
+  else if (pagamento.status === 'liberado') selo = { texto: 'Liberado', classe: 'liberado' };
+  else selo = { texto: pendente === 'sem_chave_pix' ? 'Esperando a chave Pix' : 'Esperando o banco', classe: 'pendente' };
+
+  const multa = estornado ? Math.round((pagamento.valor - (estorno?.valor || 0)) * 100) / 100 : 0;
+
+  return (
+    <div className="recibo" aria-label="Comprovante do pagamento">
+      <div className="recibo__topo">
+        <strong>Comprovante do pagamento</strong>
+        <span className={`recibo__selo recibo__selo--${selo.classe}`}>{selo.texto}</span>
       </div>
-      {repasse.liberado_em && <p className="repasse__nota">Enviado para a sua chave Pix em {formatarDataHora(repasse.liberado_em)}.</p>}
+
+      <dl className="recibo__valores">
+        <Linha rotulo={ehPrestador ? 'Pix pago pelo cliente' : 'Pix que você pagou'}>{formatarDinheiro(pagamento.valor)}</Linha>
+
+        {!estornado && ehPrestador && repasse && (
+          <>
+            <Linha rotulo={`Taxa do Fechô (${repasse.taxa_percentual.toLocaleString('pt-BR')}% do serviço)`}>
+              − {formatarDinheiro(repasse.taxa)}
+            </Linha>
+            <Linha rotulo={repasse.liberado_em ? 'Você recebeu' : 'Você vai receber'} destaque>
+              {formatarDinheiro(repasse.valor)}
+            </Linha>
+          </>
+        )}
+        {!estornado && !ehPrestador && (
+          <Linha rotulo="Situação" destaque>
+            {pagamento.status === 'liberado' ? `Liberado para ${nome}` : `Vai para ${nome} assim que o banco concluir`}
+          </Linha>
+        )}
+
+        {estornado && (
+          <>
+            <Linha rotulo={`${ehPrestador ? 'Devolvido ao cliente' : 'Devolvido para você'} (${porcento(estorno.valor, pagamento.valor)}%)`} destaque={!ehPrestador}>
+              {formatarDinheiro(estorno.valor)}
+            </Linha>
+            {multa > 0 && (
+              <Linha rotulo={`${ehPrestador ? 'Ficou com você' : `Ficou com ${nome}`} (${porcento(multa, pagamento.valor)}%)`} destaque={ehPrestador}>
+                {formatarDinheiro(multa)}
+              </Linha>
+            )}
+          </>
+        )}
+      </dl>
+
+      <dl className="recibo__detalhes">
+        {ehPrestador && repasse?.chave && (transferencia || pendente) && (
+          <Linha rotulo="Para a sua chave Pix">CPF {repasse.chave}</Linha>
+        )}
+        {transferencia && (
+          <>
+            <Linha rotulo={estornado ? 'Parte do profissional enviada em' : 'Enviado em'}>{formatarDataHora(transferencia.em)}</Linha>
+            <Linha rotulo="Código da transferência"><code>{transferencia.id}</code></Linha>
+          </>
+        )}
+        {estorno && (
+          <>
+            <Linha rotulo="Devolvido em">{formatarDataHora(estorno.estornado_em)}</Linha>
+            {estorno.id && <Linha rotulo="Código da devolução"><code>{estorno.id}</code></Linha>}
+          </>
+        )}
+        {pagamento.gateway && <Linha rotulo="Banco">{BANCOS[pagamento.gateway] || pagamento.gateway}</Linha>}
+      </dl>
     </div>
   );
 }
@@ -161,10 +243,13 @@ export function Andamento({ servico, aoAtualizar, children }) {
         ) : (
           <p className="andamento__texto">{nome} confirmou o serviço. O banco ainda não respondeu; vamos tentar o repasse de novo em alguns minutos.</p>
         )}
-        {pagamento?.repasse && <ComprovanteRepasse pagamento={pagamento} />}
+        <Comprovante servico={servico} />
       </>
     ) : (
-      <p className="andamento__texto">Serviço confirmado. O pagamento vai para {nome} assim que o repasse for concluído.</p>
+      <>
+        <p className="andamento__texto">Serviço confirmado. O pagamento vai para {nome} assim que o repasse for concluído.</p>
+        <Comprovante servico={servico} />
+      </>
     );
   }
 
@@ -183,7 +268,7 @@ export function Andamento({ servico, aoAtualizar, children }) {
             </span>
           </div>
         </div>
-        {ehPrestador && pagamento?.repasse && <ComprovanteRepasse pagamento={pagamento} />}
+        <Comprovante servico={servico} />
       </>
     );
   }
@@ -194,16 +279,7 @@ export function Andamento({ servico, aoAtualizar, children }) {
     conteudo = (
       <div className="andamento__cancelado">
         <p><strong>{quem}</strong> em {formatarDataHora(cancelamento.em)}. Motivo: {cancelamento.motivo}</p>
-        {pagamento?.estorno && (
-          <p>
-            {papel === 'contratante'
-              ? `Devolvido para você pelo Pix: ${formatarDinheiro(pagamento.estorno.valor)}.`
-              : `Devolvido ao cliente: ${formatarDinheiro(pagamento.estorno.valor)}.`}
-            {pagamento.valor - pagamento.estorno.valor > 0 && (papel === 'prestador'
-              ? ` Você recebe ${formatarDinheiro(pagamento.valor - pagamento.estorno.valor)} pela regra de cancelamento.`
-              : ` ${nome} recebe ${formatarDinheiro(pagamento.valor - pagamento.estorno.valor)} pela regra de cancelamento.`)}
-          </p>
-        )}
+        <Comprovante servico={servico} />
       </div>
     );
   }

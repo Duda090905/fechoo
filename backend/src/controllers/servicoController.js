@@ -145,10 +145,18 @@ function montarPagamento(pagamento, papel, { comPix = false } = {}) {
         liberado_em: pagamento.liberado_em
       }
       : undefined,
+    // US20 / US15 - comprovante: a transferencia ao prestador (repasse ou
+    // multa de cancelamento), com o codigo que o gateway devolveu. Os dois
+    // lados veem; o valor liquido e a taxa ficam so no bloco `repasse`.
+    transferencia: pagamento.repasse_id
+      ? { id: pagamento.repasse_id, em: pagamento.liberado_em }
+      : undefined,
     // US15 - devolucao ao contratante
     estorno: pagamento.estornado_em
-      ? { valor: emReais(pagamento.valor_estorno), estornado_em: pagamento.estornado_em }
+      ? { valor: emReais(pagamento.valor_estorno), estornado_em: pagamento.estornado_em, id: pagamento.estorno_id }
       : undefined,
+    // Qual "banco" fez o movimento: o Asaas em sandbox ou a simulacao local.
+    gateway: pagamento.gateway,
     pix: comPix && aberto && papel === 'contratante'
       ? {
         copia_cola: pagamento.pix_copia_cola,
@@ -498,6 +506,13 @@ async function detalhar(req, res, next) {
       em: h.registrado_em
     }));
     resposta.avaliacoes = avaliacoes;
+    // US20 - no comprovante, o prestador ve para qual chave Pix o dinheiro foi
+    // (mascarada, como na US06). O cliente nao ve a chave de ninguem.
+    if (servico.papel === 'prestador' && resposta.pagamento && resposta.pagamento.repasse) {
+      const { chaveMascarada } = require('./prestadorController');
+      const dono = await Prestador.findByPk(servico.id_prestador, { attributes: ['chave_pix'] });
+      resposta.pagamento.repasse.chave = dono && dono.chave_pix ? chaveMascarada(dono.chave_pix) : null;
+    }
     // US24 - o prestador ve a reputacao de quem pediu.
     if (servico.papel === 'prestador' && servico.contratante) {
       Object.assign(resposta.contratante, await mediaDoContratante(servico.contratante.id));

@@ -366,6 +366,6 @@ async function listar(req, res, next) {
 }
 
 module.exports = {
-  montarPerfil, contarConcluidos,
+  montarPerfil, contarConcluidos, chaveMascarada,
   meuPerfil, salvarPerfil, enviarFoto, removerFoto, alternarPausa, listar, cadastrarChavePix
 };

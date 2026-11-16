@@ -149,6 +149,13 @@ async function testarSprint4({ chamar, checar, base, bairro, idsCategorias, terc
     && vistoPrestador.pagamento.repasse.valor === 204);
   const vistoCliente = await detalhe(idUm, bia.token);
   checar('a taxa do prestador nao aparece para o cliente', vistoCliente.pagamento.repasse === undefined);
+  checar('comprovante do prestador: codigo da transferencia, data, banco e a chave Pix mascarada',
+    Boolean(vistoPrestador.pagamento.transferencia.id) && vistoPrestador.pagamento.transferencia.id === pagUm.repasse_id
+    && Boolean(vistoPrestador.pagamento.transferencia.em) && vistoPrestador.pagamento.gateway === 'simulado'
+    && /^\*\*\*\.\d{3}\.\d{3}-\*\*$/.test(vistoPrestador.pagamento.repasse.chave));
+  checar('comprovante do cliente: ve o codigo e a data da liberacao, mas nao a chave Pix nem a taxa do prestador',
+    vistoCliente.pagamento.transferencia.id === pagUm.repasse_id
+    && !JSON.stringify(vistoCliente.pagamento).includes('***.'));
   const deNovo = await chamar(`/servicos/${idUm}/confirmar`, { metodo: 'POST', token: bia.token });
   checar('confirmar de novo nao repete o repasse', deNovo.status === 409);
   checar('cada passo fica no historico do servico (quem e quando)',
@@ -245,6 +252,10 @@ async function testarSprint4({ chamar, checar, base, bairro, idsCategorias, terc
   checar('cancelamento dentro do prazo (mais de 24 horas) gera estorno integral',
     canceladoMais24.status === 200 && pagMais24.status === 'estornado'
     && Number(pagMais24.valor_estorno) === 300 && Number(pagMais24.valor_repasse) === 0 && Boolean(pagMais24.estorno_id));
+  const comprovanteEstorno = (await detalhe(idMais24, bia.token)).pagamento;
+  checar('comprovante do estorno: status Estornado, valor devolvido e codigo do estorno',
+    comprovanteEstorno.status === 'estornado' && comprovanteEstorno.estorno.valor === 300
+    && comprovanteEstorno.estorno.id === pagMais24.estorno_id);
   checar('o cancelamento registra o motivo e quem cancelou',
     canceladoMais24.dados.servico.status === 'cancelado' && canceladoMais24.dados.servico.cancelamento.por === 'contratante'
     && canceladoMais24.dados.servico.cancelamento.motivo === 'Mudei de planos');

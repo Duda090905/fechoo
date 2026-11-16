@@ -12,6 +12,7 @@ const {
 } = require('../src/models');
 const { processarConclusoes } = require('../src/servicos/repasse');
 const { percentualPara } = require('../src/servicos/taxa');
+const { recalcularMedia, mediaComPeso } = require('../src/servicos/avaliacoes');
 
 const HORA = 60 * 60 * 1000;
 const MINUTO = 60 * 1000;
@@ -396,8 +397,34 @@ async function testarSprint4({ chamar, checar, base, bairro, idsCategorias, terc
   const depoisPrazo = await publicas();
   checar('vencido o prazo de 7 dias, a avaliacao enviada aparece mesmo sem a outra',
     depoisPrazo.avaliacoes.length === 2);
-  checar('a nota do prestador e a media simples das avaliacoes publicadas ((5 + 3) / 2 = 4)',
+  checar('com ate 10 avaliacoes, todas sao recentes e valem o mesmo ((5 x 2 + 3 x 2) / 4 = 4)',
     depoisPrazo.nota_media === 4 && depoisPrazo.total_avaliacoes === 2);
+
+  // Peso maior para os ultimos 10 servicos: 10 notas 5 recentes e 2 notas 1 antigas.
+  const gil = await prestadorPronto('Gil Moraes', 667788990, 'gil.s4@teste.com');
+  const notasGil = [...Array(10).fill(5), 1, 1]; // da mais recente para a mais antiga
+  for (let i = 0; i < notasGil.length; i += 1) {
+    const quando = new Date(Date.now() - (i + 1) * DIA);
+    const s = await Servico.create({
+      id_contratante: bia.usuario.id, id_prestador: gil.prestador.id, bairro_id: bairro.id, descricao: `Avaliado ${i}`,
+      fotos: [], data_hora_solicitada: quando, valor: 100, prazo_horas: 1, status: 'pago', confirmado_em: quando
+    });
+    await Avaliacao.create({
+      servico_id: s.id, autor_id: bia.usuario.id, avaliado_id: gil.usuario.id, papel_autor: 'contratante',
+      nota: notasGil[i], editavel_ate: quando, prazo_ate: quando, liberada_em: quando
+    });
+  }
+  await recalcularMedia(gil.usuario.id);
+  const notaGil = (await chamar(`/prestadores/${gil.prestador.id}/avaliacoes`)).dados;
+  // (10 x 5 x 2 + 2 x 1 x 1) / (10 x 2 + 2 x 1) = 102 / 22 = 4,64. A media simples daria 52 / 12 = 4,33.
+  checar('a media da peso maior para os ultimos 10 servicos ((10 x 5 x 2 + 2 x 1 x 1) / 22 = 4,64; simples daria 4,33)',
+    notaGil.nota_media === 4.64 && notaGil.total_avaliacoes === 12);
+  checar('a ordem vale pela data do servico: 10 notas 1 recentes e 2 notas 5 antigas = (20 + 10) / 22 = 1,36',
+    mediaComPeso([
+      ...Array.from({ length: 10 }, (_, i) => ({ nota: 1, servico: { confirmado_em: new Date(Date.now() - i * DIA) } })),
+      { nota: 5, servico: { confirmado_em: new Date(Date.now() - 30 * DIA) } },
+      { nota: 5, servico: { confirmado_em: new Date(Date.now() - 31 * DIA) } }
+    ]) === 1.36);
   await Servico.update({ confirmado_em: new Date(Date.now() - 8 * DIA) }, { where: { id: idEdu } });
   const foraDoPrazo = await chamar(`/servicos/${idEdu}/avaliacao`, { metodo: 'POST', token: bia.token, corpo: { nota: 5 } });
   checar('depois do prazo de 7 dias, nao da mais para avaliar', foraDoPrazo.status === 409);

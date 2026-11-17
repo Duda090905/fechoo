@@ -38,3 +38,24 @@ export function IconeMenu(p) {
 export function IconeFechar(p) {
   return <svg {...base} {...p}><path d="m6 6 12 12" /><path d="m18 6-12 12" /></svg>;
 }
+export function IconeLocal(p) {
+  return <svg {...base} {...p}><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.4" /></svg>;
+}
+export function IconeCalendario(p) {
+  return <svg {...base} {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16" /><path d="M8.5 3.5v4" /><path d="M15.5 3.5v4" /></svg>;
+}
+export function IconeImagem(p) {
+  return <svg {...base} {...p}><rect x="3.5" y="5" width="17" height="14" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m4.5 17.5 5-5 4 4 2.5-2.5 3.5 3.5" /></svg>;
+}
+export function IconeEnviar(p) {
+  return <svg {...base} {...p}><path d="M20.5 3.5 10 14" /><path d="m20.5 3.5-6.5 17-4-6.5-6.5-4 17-6.5Z" /></svg>;
+}
+export function IconeVoltar(p) {
+  return <svg {...base} {...p}><path d="M19 12H6" /><path d="m11.5 6-6 6 6 6" /></svg>;
+}
+export function IconeSelo(p) {
+  return <svg {...base} {...p}><path d="M12 3 5 6v6c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></svg>;
+}
+export function IconeMais(p) {
+  return <svg {...base} {...p}><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
+}

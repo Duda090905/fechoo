@@ -87,3 +87,11 @@
   background: var(--azul-noite); color: #fff;
   font-family: var(--fonte-titulo); font-weight: 600; font-size: 23px;
 }
+
+/* US06 - selo de identidade verificada no proprio perfil */
+.identidade { margin: 0 0 8px; }
+.selo-grande {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px;
+  border-radius: var(--raio-total); background: var(--azul-claro); color: var(--azul-medio);
+  font-weight: 600; font-size: 14px;
+}

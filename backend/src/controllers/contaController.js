@@ -2,6 +2,8 @@ const { Prestador, SolicitacaoExclusao } = require('../models');
 const { listarPendencias } = require('../servicos/pendencias');
 const { iniciarPausa } = require('../servicos/pausas');
 const { anonimizarConta } = require('../servicos/anonimizacao');
+const { senhaForte, gerarHash, conferir, REGRA } = require('../utils/senha');
+const { gerarJWT } = require('../utils/token');
 
 // US04 - registra data (created_at), origem e resultado de cada pedido.
 function registrarSolicitacao(usuarioId, tipo, resultado) {
@@ -125,4 +127,46 @@ async function excluirDefinitivo(req, res, next) {
   }
 }
 
-module.exports = { meusDados, pendencias, desativar, reativar, excluirDefinitivo };
+/**
+ * US26 (curinga CC06) - Alterar a senha estando logado.
+ *
+ * Exige a senha atual, aplica a mesma regra de forca do cadastro e sobe o
+ * token_versao (mecanismo da US03): todas as sessoes abertas deixam de valer.
+ * A sessao que fez a troca recebe um token novo e continua ativa.
+ *
+ * Senha atual errada responde 400, e nao 401: no front, 401 significa sessao
+ * encerrada e mandaria a pessoa de volta para o login.
+ */
+async function trocarSenha(req, res, next) {
+  try {
+    const { senha_atual: senhaAtual, nova_senha: novaSenha } = req.body;
+    const usuario = req.usuario;
+
+    if (typeof senhaAtual !== 'string' || typeof novaSenha !== 'string' || !senhaAtual || !novaSenha) {
+      return res.status(400).json({ erro: 'Informe a senha atual e a nova senha.' });
+    }
+    if (!(await conferir(senhaAtual, usuario.senha_hash))) {
+      return res.status(400).json({ erro: 'A senha atual não confere.' });
+    }
+    if (!senhaForte(novaSenha)) {
+      return res.status(400).json({ erro: REGRA });
+    }
+    if (novaSenha === senhaAtual) {
+      return res.status(400).json({ erro: 'A nova senha precisa ser diferente da atual.' });
+    }
+
+    usuario.senha_hash = await gerarHash(novaSenha);
+    usuario.token_versao = (usuario.token_versao || 0) + 1;
+    await usuario.save();
+
+    return res.json({
+      mensagem: 'Senha alterada. Os outros aparelhos em que sua conta estava aberta foram desconectados.',
+      token: gerarJWT(usuario),
+      usuario: usuario.publico()
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { meusDados, pendencias, desativar, reativar, excluirDefinitivo, trocarSenha };

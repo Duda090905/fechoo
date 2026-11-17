@@ -50,6 +50,21 @@ async function requisitar(caminho, { metodo = 'GET', corpo, autenticado = false 
   return dados;
 }
 
+// US10 / US12 - fotos do pedido e imagens do chat nao sao publicas: a API so
+// entrega com login. Baixa o arquivo e devolve um endereco local (blob:).
+export async function baixarArquivoProtegido(caminho) {
+  const token = pegarToken();
+  let resposta;
+  try {
+    resposta = await fetch(`${BASE}${caminho}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new Error('Não consegui baixar a imagem.');
+  }
+  if (resposta.status === 401) window.dispatchEvent(new Event(SESSAO_EXPIRADA));
+  if (!resposta.ok) throw new Error('Imagem indisponível.');
+  return URL.createObjectURL(await resposta.blob());
+}
+
 export const api = {
   cadastrar: (corpo) => requisitar('/auth/register', { metodo: 'POST', corpo }),
   entrar: (corpo) => requisitar('/auth/login', { metodo: 'POST', corpo }),
@@ -61,6 +76,8 @@ export const api = {
   desativarConta: (corpo) => requisitar('/conta', { metodo: 'DELETE', corpo, autenticado: true }),
   reativarConta: () => requisitar('/conta/reativar', { metodo: 'POST', autenticado: true }),
   excluirDefinitivo: (corpo) => requisitar('/conta/definitiva', { metodo: 'DELETE', corpo, autenticado: true }),
+  // US26 (curinga CC06)
+  trocarSenha: (corpo) => requisitar('/conta/senha', { metodo: 'PUT', corpo, autenticado: true }),
 
   areas: () => requisitar('/catalogo/areas'),
   bairros: () => requisitar('/catalogo/bairros'),
@@ -74,6 +91,8 @@ export const api = {
   },
   removerFoto: () => requisitar('/prestadores/foto', { metodo: 'DELETE', autenticado: true }),
   alternarPausa: () => requisitar('/prestadores/pausa', { metodo: 'PATCH', autenticado: true }),
+  // US06 - chave Pix e selo
+  cadastrarChavePix: (corpo) => requisitar('/prestadores/chave-pix', { metodo: 'PUT', corpo, autenticado: true }),
 
   listarPrestadores: (filtros = {}) => {
     const busca = new URLSearchParams();
@@ -84,5 +103,23 @@ export const api = {
     });
     const query = busca.toString();
     return requisitar(`/prestadores${query ? `?${query}` : ''}`);
-  }
+  },
+
+  // US10 / US13 - pedido com fotos (FormData), lista e agenda
+  criarServico: (form) => requisitar('/servicos', { metodo: 'POST', corpo: form, autenticado: true }),
+  listarServicos: () => requisitar('/servicos', { autenticado: true }),
+  agenda: () => requisitar('/servicos/agenda', { autenticado: true }),
+  servico: (id) => requisitar(`/servicos/${id}`, { autenticado: true }),
+  enviarOrcamento: (id, corpo) => requisitar(`/servicos/${id}/orcamento`, { metodo: 'POST', corpo, autenticado: true }),
+  recusarOrcamento: (id) => requisitar(`/servicos/${id}/recusar`, { metodo: 'POST', autenticado: true }),
+  // US11 / US17 - aceitar o orçamento gera o Pix
+  aceitarOrcamento: (id, corpo) => requisitar(`/servicos/${id}/aceitar`, { metodo: 'POST', corpo, autenticado: true }),
+
+  // US11 / US18 - avisos
+  notificacoes: () => requisitar('/notificacoes', { autenticado: true }),
+  marcarNotificacoesLidas: () => requisitar('/notificacoes/lidas', { metodo: 'POST', autenticado: true }),
+
+  // US12 - chat
+  mensagens: (id, depois = 0) => requisitar(`/servicos/${id}/mensagens${depois ? `?depois=${depois}` : ''}`, { autenticado: true }),
+  enviarMensagem: (id, form) => requisitar(`/servicos/${id}/mensagens`, { metodo: 'POST', corpo: form, autenticado: true })
 };

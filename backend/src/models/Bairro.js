@@ -12,8 +12,8 @@ class Bairro extends Model {
 
   static associate(models) {
     this.belongsToMany(models.Prestador, {
-      through: 'prestador_bairros', foreignKey: 'bairro_id',
-      otherKey: 'prestador_id', as: 'prestadores', timestamps: false
+      through: { model: models.PrestadorBairro, unique: false }, foreignKey: 'bairro_id',
+      otherKey: 'prestador_id', as: 'prestadores'
     });
   }
 }

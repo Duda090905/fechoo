@@ -1,10 +1,15 @@
 /**
- * Guarda e apaga as fotos de perfil (US05).
+ * Guarda e apaga os arquivos enviados.
+ *
+ * - Fotos de perfil (US05): pasta uploads/perfis, publica, servida em
+ *   /uploads/perfis/<nome>.
+ * - Fotos do pedido (US10) e imagens do chat (US12): pasta uploads/servicos,
+ *   que NAO e publica. So as duas partes do servico abrem esses arquivos, pela
+ *   rota com login GET /api/servicos/:id/arquivos/:nome.
  *
  * Hoje grava em disco, na pasta uploads/ (ou UPLOADS_DIR). Todo o resto do
- * sistema so conhece estas funcoes e a URL relativa que elas devolvem
- * (/uploads/perfis/<nome>), entao trocar por um armazenamento externo
- * (S3 ou similar) mexe apenas neste arquivo.
+ * sistema so conhece estas funcoes, entao trocar por um armazenamento
+ * externo (S3 ou similar) mexe apenas neste arquivo.
  *
  * Documentos de identidade da US06 NAO devem passar por aqui: o requisito
  * e nunca guardar a imagem do documento.
@@ -24,6 +29,10 @@ function pastaPerfis() {
   return path.join(raizUploads(), 'perfis');
 }
 
+function pastaServicos() {
+  return path.join(raizUploads(), 'servicos');
+}
+
 // Descobre o formato pelos primeiros bytes, sem confiar no nome nem no tipo
 // que o navegador informou. SVG nao entra: pode carregar script.
 function detectarTipo(buffer) {
@@ -40,12 +49,26 @@ function detectarTipo(buffer) {
   return null;
 }
 
+// Grava com nome aleatorio e devolve o nome.
+async function gravar(pasta, buffer, ext) {
+  await fs.mkdir(pasta, { recursive: true });
+  const nome = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
+  await fs.writeFile(path.join(pasta, nome), buffer);
+  return nome;
+}
+
+// Apaga sem reclamar se o arquivo ja nao existe.
+async function apagar(pasta, nome) {
+  try {
+    await fs.unlink(path.join(pasta, nome));
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+}
+
 // Devolve a URL relativa da foto salva.
 async function salvarFotoPerfil(buffer, ext) {
-  await fs.mkdir(pastaPerfis(), { recursive: true });
-  const nome = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
-  await fs.writeFile(path.join(pastaPerfis(), nome), buffer);
-  return `${PREFIXO}${nome}`;
+  return `${PREFIXO}${await gravar(pastaPerfis(), buffer, ext)}`;
 }
 
 // Apaga o arquivo se a URL for de uma foto nossa. Qualquer outro valor
@@ -54,11 +77,7 @@ async function removerFotoPerfil(url) {
   if (typeof url !== 'string' || !url.startsWith(PREFIXO)) return;
   const nome = url.slice(PREFIXO.length);
   if (!NOME_VALIDO.test(nome)) return;
-  try {
-    await fs.unlink(path.join(pastaPerfis(), nome));
-  } catch (e) {
-    if (e.code !== 'ENOENT') throw e;
-  }
+  await apagar(pastaPerfis(), nome);
 }
 
 // So expoe para o front fotos que estao no nosso armazenamento.
@@ -68,4 +87,29 @@ function urlPublica(url) {
     : null;
 }
 
-module.exports = { raizUploads, detectarTipo, salvarFotoPerfil, removerFotoPerfil, urlPublica };
+// US10 / US12 - devolve so o nome; o arquivo nunca tem URL publica.
+async function salvarArquivoServico(buffer, ext) {
+  return gravar(pastaServicos(), buffer, ext);
+}
+
+async function removerArquivoServico(nome) {
+  if (typeof nome !== 'string' || !NOME_VALIDO.test(nome)) return;
+  await apagar(pastaServicos(), nome);
+}
+
+// Caminho no disco de um arquivo de servico, ou null se o nome nao e nosso.
+function caminhoArquivoServico(nome) {
+  return typeof nome === 'string' && NOME_VALIDO.test(nome) ? path.join(pastaServicos(), nome) : null;
+}
+
+module.exports = {
+  raizUploads,
+  pastaPerfis,
+  detectarTipo,
+  salvarFotoPerfil,
+  removerFotoPerfil,
+  urlPublica,
+  salvarArquivoServico,
+  removerArquivoServico,
+  caminhoArquivoServico
+};

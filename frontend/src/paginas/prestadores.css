@@ -1,56 +1,68 @@
-/* Listagem de profissionais.
-   Barra de filtros que acompanha a rolagem e cartões em grade. */
+/* Busca de profissionais (US09).
+   A faixa escura continua o cabeçalho; a busca é uma frase com duas lacunas
+   para preencher. Abaixo, os cartões em grade. */
 
-.lista-topo {
-  background: var(--superficie);
-  border-bottom: 1px solid var(--borda);
-}
-.lista-topo__interno {
-  max-width: 980px; margin: 0 auto;
-  padding: clamp(28px, 4vw, 44px) 22px 0;
-}
-.lista-topo h1 { font-size: clamp(27px, 3.4vw, 36px); margin: 0 0 8px; }
-.lista-topo__resumo { color: var(--texto-suave); font-size: 16.5px; margin: 0 0 22px; }
-.lista-topo__resumo strong { color: var(--texto); font-weight: 600; }
-
-/* Trilho de categorias -------------------------------------------------- */
-.trilho {
-  display: flex; gap: 9px;
-  overflow-x: auto;
-  padding: 0 0 18px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.trilho::-webkit-scrollbar { display: none; }
-
-.trilho__item {
-  flex: 0 0 auto;
-  border: 1.5px solid var(--borda);
-  background: var(--superficie);
-  color: var(--texto-suave);
-  border-radius: var(--raio-total);
-  padding: 9px 16px;
-  font-family: var(--fonte-texto);
-  font-size: 14.5px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-.trilho__item:hover { border-color: #C3CCDA; color: var(--texto); }
-.trilho__item--ativo {
+.busca {
   background: var(--azul-noite);
-  border-color: var(--azul-noite);
   color: #fff;
-  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+}
+.busca::before {
+  /* o mesmo brilho discreto da capa da home, saindo do canto de baixo */
+  content: '';
+  position: absolute;
+  bottom: -300px; right: -160px;
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(255, 201, 60, .10), transparent 62%);
+  pointer-events: none;
+}
+.busca__interno {
+  position: relative;
+  max-width: 980px; margin: 0 auto;
+  padding: clamp(36px, 6vw, 64px) 22px clamp(26px, 4vw, 36px);
 }
 
-/* Barra de filtros ------------------------------------------------------ */
-.filtros {
-  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
-  padding: 0 0 20px;
+.busca__frase {
+  font-family: var(--fonte-titulo);
+  font-weight: 600;
+  font-size: clamp(27px, 4.6vw, 46px);
+  line-height: 1.35;
+  letter-spacing: -.025em;
+  margin: 0 0 26px;
 }
-.filtros .campo { margin: 0; min-width: 190px; }
-.filtros__separador { flex: 1; }
+.busca__frase > span { color: #B8C4D8; }
+
+/* A lacuna: o texto escolhido, sublinhado, com a seta. O select nativo fica
+   por cima, transparente, para abrir a lista do aparelho e funcionar no teclado. */
+.lacuna { position: relative; display: inline-block; max-width: 100%; cursor: pointer; }
+.lacuna__texto {
+  display: inline-block; max-width: 100%;
+  color: #fff;
+  border-bottom: 3px solid rgba(255, 255, 255, .35);
+  padding-right: .9em;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .1em center;
+  background-size: .55em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  vertical-align: bottom;
+  transition: border-color .15s ease;
+}
+.lacuna select {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+  font-size: 16px; /* evita o zoom automatico do iPhone ao tocar */
+}
+.lacuna:hover .lacuna__texto { border-bottom-color: rgba(255, 255, 255, .75); }
+.lacuna:focus-within .lacuna__texto { border-bottom-color: #fff; }
+.lacuna:has(select:focus-visible) .lacuna__texto { outline: 3px solid #fff; outline-offset: 4px; border-radius: 4px; }
+
+.busca__rodape {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;
+}
+.busca__total { margin: 0; color: #B8C4D8; font-size: 15px; }
 
 .alternador {
   display: inline-flex; align-items: center; gap: 10px;
@@ -70,6 +82,12 @@
   color: var(--azul-noite);
   font-weight: 500;
 }
+.alternador--escuro { background: transparent; border-color: rgba(255, 255, 255, .25); color: #DCE3EE; }
+.alternador--escuro:hover { border-color: rgba(255, 255, 255, .5); }
+.alternador--escuro input { accent-color: #fff; }
+.alternador--escuro.alternador--ativo { background: #fff; border-color: #fff; color: var(--azul-noite); }
+.alternador--escuro.alternador--ativo input { accent-color: var(--azul-noite); }
+.alternador:has(input:focus-visible) { outline: 3px solid #fff; outline-offset: 2px; }
 
 /* Resultados ------------------------------------------------------------ */
 .resultados {
@@ -87,15 +105,11 @@
   border-radius: var(--raio-grande);
   padding: 24px;
   display: flex; flex-direction: column;
-  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+  transition: box-shadow .2s ease, border-color .2s ease;
 }
-.ficha:hover {
-  box-shadow: var(--sombra-alta);
-  transform: translateY(-2px);
-  border-color: #C9D4E4;
-}
+.ficha:hover { box-shadow: var(--sombra-alta); border-color: #C9D4E4; }
 
-.ficha__topo { display: flex; gap: 15px; align-items: flex-start; margin-bottom: 16px; }
+.ficha__topo { display: flex; gap: 15px; align-items: center; margin-bottom: 16px; }
 .ficha__avatar {
   flex: 0 0 52px;
   width: 52px; height: 52px;
@@ -104,8 +118,26 @@
   background: var(--azul-noite); color: #fff;
   font-family: var(--fonte-titulo); font-weight: 600; font-size: 21px;
 }
-.ficha__nome { margin: 0 0 6px; font-size: 18px; }
-.ficha__selos { display: flex; flex-wrap: wrap; gap: 6px; }
+.ficha__nome { margin: 0 0 5px; font-size: 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 9px; }
+
+/* Selo de identidade verificada (o dado vem da US06). */
+.selo {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px 2px 7px; border-radius: var(--raio-total);
+  background: var(--azul-claro); color: var(--azul-medio);
+  font-family: var(--fonte-texto); font-size: 12.5px; font-weight: 600; letter-spacing: 0;
+}
+
+.ficha__numeros {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  font-size: 14px; color: var(--texto-suave);
+}
+.ficha__nota {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 15px; color: var(--texto);
+}
+.ficha__nota svg { color: #C89400; fill: #C89400; }
+.ficha__separador { width: 1px; height: 14px; background: var(--borda); }
 
 .ficha__descricao {
   color: var(--texto-suave);
@@ -118,15 +150,20 @@
 }
 
 .ficha__categorias { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.ficha .etiqueta--forte { background: var(--azul-noite); color: #fff; }
 
 .ficha__rodape {
   margin-top: auto;
   padding-top: 15px;
   border-top: 1px solid var(--borda);
-  display: flex; gap: 9px; align-items: flex-start;
-  font-size: 14px; color: var(--texto-claro);
+  display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap;
 }
-.ficha__rodape svg { flex: 0 0 17px; margin-top: 1px; }
+.ficha__bairros {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 14px; color: var(--texto-suave);
+  flex: 1 1 180px; min-width: 0;
+}
+.ficha__bairros svg { flex: 0 0 17px; margin-top: 2px; color: var(--azul-medio); }
 
 /* Esqueleto de carregamento --------------------------------------------- */
 .esqueleto { pointer-events: none; }
@@ -157,9 +194,12 @@
   background: var(--azul-claro); color: var(--azul-medio);
 }
 .nada h3 { font-size: 18px; margin: 0 0 6px; }
-.nada p { color: var(--texto-suave); margin: 0 0 20px; font-size: 15px; }
+.nada p { color: var(--texto-suave); margin: 0 auto 20px; font-size: 15px; max-width: 46ch; }
 
 @media (max-width: 720px) {
   .resultados { grid-template-columns: 1fr; }
-  .filtros .campo { min-width: 0; flex: 1 1 100%; }
+}
+@media (max-width: 480px) {
+  .ficha__separador { display: none; }
+  .ficha__numeros { gap: 2px 12px; }
 }

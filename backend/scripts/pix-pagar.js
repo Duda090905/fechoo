@@ -15,6 +15,9 @@
  *   --repetir        manda o mesmo aviso duas vezes (idempotencia)
  *   --token-errado   manda o aviso com um token falso (deve dar 401)
  *   --local          ignora o Asaas e manda o aviso direto para a API local
+ *
+ * US19 - tambem paga o Pix adicional da proposta complementar (o Pix em
+ * aberto mais recente do servico, seja o original ou o complementar).
  */
 require('dotenv').config();
 const crypto = require('crypto');
@@ -54,7 +57,7 @@ async function rodar() {
     console.log('Uso: npm run pix:pagar -- <id do servico> [--repetir] [--token-errado] [--local]');
     return;
   }
-  const pagamento = await Pagamento.findOne({
+  const pagamento = await Pagamento.unscoped().findOne({
     where: { servico_id: servicoId, status: 'aguardando', expirado_em: null },
     order: [['id', 'DESC']]
   });
@@ -62,7 +65,8 @@ async function rodar() {
     console.log(`O servico ${servicoId} nao tem Pix esperando pagamento. Aceite o orcamento antes.`);
     return;
   }
-  console.log(`Pix do servico ${servicoId}: R$ ${Number(pagamento.valor).toFixed(2)} (${pagamento.gateway}, ${pagamento.cobranca_id})`);
+  const rotulo = pagamento.tipo === 'complementar' ? 'Pix complementar' : 'Pix';
+  console.log(`${rotulo} do servico ${servicoId}: R$ ${Number(pagamento.valor).toFixed(2)} (${pagamento.gateway}, ${pagamento.cobranca_id})`);
 
   if (pagamento.gateway === 'asaas' && !opcao('local')) {
     await confirmarNoSandbox(pagamento.cobranca_id);

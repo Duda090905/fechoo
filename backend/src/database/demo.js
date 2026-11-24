@@ -1,5 +1,5 @@
 /**
- * Dados de demonstracao dos Sprints 2, 3 e 4 (npm run db:demo).
+ * Dados de demonstracao dos Sprints 2 a 5 (npm run db:demo).
  *
  * Alguns servicos sao gravados direto no banco no estado em que o fluxo real
  * os deixaria (Aceito com pagamento Retido, Pago com repasse e taxa,
@@ -9,7 +9,12 @@
  *   - Sprint 4: a Rita chega, inicia e conclui o servico de "agora" e a Ana
  *     confirma (repasse a 6%: a Rita ja tem 20 servicos); a Ana confirma o
  *     servico do disjuntor e o repasse do Eli espera a chave Pix; cancelar,
- *     pedir nova data, avaliar e chamar de novo pelo historico.
+ *     pedir nova data, avaliar e chamar de novo pelo historico;
+ *   - Sprint 5 (demo-sprint5.js): o administrador decide a disputa do
+ *     Bruno com o Joao; o Bruno abre disputa sobre o servico que a Rita
+ *     concluiu ha 2 horas; o Bruno aceita e paga a proposta complementar da
+ *     Rita; a Rita propoe complementar no servico de daqui a 30 min (depois
+ *     do Cheguei); o extrato da Rita.
  *
  * Nada mais e simulado: a nota media vem de avaliacoes de verdade (US24) e a
  * conclusao e o repasse existem (US20).
@@ -29,6 +34,7 @@ const { garantirColunas } = require('./colunas');
 const { montarCopiaECola } = require('../utils/pix');
 const { gerarHash } = require('../utils/senha');
 const { cpfValido } = require('../utils/cpf');
+const { criarDemoSprint5, apagarDemoSprint5, ADMIN } = require('./demo-sprint5');
 
 const SENHA = 'demo1234';
 const HORA = 60 * 60 * 1000;
@@ -73,7 +79,10 @@ async function porNome(Modelo, nome) {
 async function apagarDemo() {
   const usuarios = await Usuario.findAll({ where: { email: Object.values(PESSOAS).map((p) => p.email) } });
   const idsUsuarios = usuarios.map((u) => u.id);
-  if (!idsUsuarios.length) return;
+  if (!idsUsuarios.length) {
+    await apagarDemoSprint5([]);
+    return;
+  }
   const prestadores = await Prestador.findAll({ where: { usuario_id: idsUsuarios } });
   const idsPrestadores = prestadores.map((p) => p.id);
   const servicos = await Servico.findAll({
@@ -81,9 +90,12 @@ async function apagarDemo() {
   });
   const idsServicos = servicos.map((s) => s.id);
 
-  const pagamentos = await Pagamento.findAll({ where: { servico_id: idsServicos } });
+  // Sprint 5 - disputas, propostas complementares e a conta do administrador
+  await apagarDemoSprint5(idsServicos);
+  // unscoped: inclui o Pix complementar (US19)
+  const pagamentos = await Pagamento.unscoped().findAll({ where: { servico_id: idsServicos } });
   await EventoWebhook.destroy({ where: { cobranca_id: pagamentos.map((p) => p.cobranca_id).filter(Boolean) } });
-  await Pagamento.destroy({ where: { servico_id: idsServicos } });
+  await Pagamento.unscoped().destroy({ where: { servico_id: idsServicos } });
   await Notificacao.destroy({ where: { servico_id: idsServicos } });
   await Avaliacao.destroy({ where: { servico_id: idsServicos } });
   await Reagendamento.destroy({ where: { servico_id: idsServicos } });
@@ -325,6 +337,9 @@ async function rodar() {
     contratante: u.ana, prestador: joao, diasAtras: 1, anteriores: 1
   });
 
+  // Sprint 5 - disputa, painel do administrador, complementar e extrato
+  const sprint5 = await criarDemoSprint5({ u, rita, joao, cambui, taquaral, barao, eletricista, encanador, pintor, senhaHash });
+
   for (const p of [rita, eli, joao, lia]) await recalcularMedia(p.usuario_id);
 
   const cpfFormatado = (c) => `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}`;
@@ -344,6 +359,14 @@ Dados de demonstracao criados. Senha de todas as contas: ${SENHA}
                                        CPF da Ana (chave errada, para ver a recusa): ${cpfFormatado(u.ana.cpf)}
   joao.demo@fecho.app   prestador    avaliar a Ana (pintura do portao, confirmada ontem)
 
+  Sprint 5
+  ${ADMIN.email}  administrador  DECIDIR a disputa do servico ${sprint5.d1.id} (Bruno x Joao, R$ 400 congelados, com defesa);
+                                         suspender um profissional; relatorio e registro (1 decisao antiga)
+  bruno.demo@fecho.app  contratante  ABRIR DISPUTA no servico ${sprint5.d2.id} (Rita concluiu ha 2 h);
+                                     ACEITAR e pagar a proposta complementar no servico ${sprint5.c1.id} (+R$ 90)
+  rita.demo@fecho.app   prestadora   EXTRATO (repasses, complementar, disputa dividida e valores congelados);
+                                     PROPOR valor complementar no servico de daqui a 30 min (depois do Cheguei)
+
 Para pagar o Pix depois de aceitar: npm run pix:pagar -- <id do servico>
 Para ver a confirmacao automatica ao vivo: CONFIRMACAO_HORAS=0.05 no .env (3 minutos).
 `);
@@ -351,7 +374,7 @@ Para ver a confirmacao automatica ao vivo: CONFIRMACAO_HORAS=0.05 no .env (3 min
 }
 
 rodar().catch(async (e) => {
-  console.error('Falha ao criar os dados de demonstracao:', e.message);
+  console.error('Falha ao criar os dados de demonstracao:', e.message, e.sql || '');
   await sequelize.close().catch(() => {});
   process.exit(1);
 });

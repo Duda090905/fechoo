@@ -15,6 +15,7 @@ A numeração dos itens segue a lista combinada na análise do Sprint 1.
 | Retenção de conta inativa (US04) | 12 meses, aviso 30 dias antes | Concluída |
 | 5. Endurecimento | Cancelada (era 13, 14 e teste de bloqueio de login: fora dos cards) | Cancelada |
 | Sprint 2 | US09, US10, US12, US13 e US26 (curinga CC06) | Concluída |
+| Sprint 5 (final) | US23, US25, US19 e US22 ([seção no fim](#sprint-5-final-us23-us25-us19-e-us22)) | Concluída |
 | Sprint 3 | US06, US11, US17 e US18 | Concluída |
 | Sprint 4 | US20, US24, US15, US21, US14 e US16 (35 pontos) | Concluída |
 
@@ -822,3 +823,91 @@ Para mostrar no painel do Asaas o que a US15 ("disparar o estorno **no gateway**
 - **`npm run asaas:saldo`:** cria uma cobrança de teste de R$ 1.000 e marca como paga no sandbox. A transferência e o estorno saem do saldo da conta.
 - Teste novo: "no Asaas sandbox, o repasse vai para a chave de teste do Banco Central". `npm run teste`: **326 critérios**, 0 falhas.
 
+
+---
+
+## Sprint 5 (final): US23, US25, US19 e US22
+
+Branch: `Sprint-final` (criada a partir do estado da `Sprint-4`). Com estes quatro cards, as 25 histórias do backlog e o curinga US26 estão entregues. Cada critério, com o teste e o passo na tela, está no `Checklist Sprint 5 Fechô.md`.
+
+### US23 - Abertura de disputa
+
+| No cartão | Onde está |
+|---|---|
+| Tabela Disputas com justificativa e evidências | `models/Disputa.js` (uma por serviço; fotos sem GPS na pasta privada) e `POST /api/servicos/:id/disputa` |
+| Abertura até 72 h após concluído | `servicos/disputas.js` (`motivoParaNaoAbrir`): Em execução, ou Concluído há no máximo `CONFIRMACAO_HORAS` (72) |
+| Congelar o valor | o serviço vai para `em_disputa` (troca atômica); o pagamento segue `retido` |
+| Defesa do prestador | `POST /api/servicos/:id/disputa/defesa` (texto + até 3 fotos, uma vez) |
+
+### US25 - Painel do administrador
+
+| No cartão | Onde está |
+|---|---|
+| Fila de disputas com evidências | `GET /api/admin/disputas` e `/admin/disputas/:id` (evidências das duas partes, chat, fotos do pedido, histórico, pagamentos e ficha de cada parte) |
+| Decisões devolver / liberar / dividir com justificativa | `POST /api/admin/disputas/:id/decisao`; `servicos/disputas.js` (`decidir`) chama o estorno ou a transferência no gateway |
+| Suspensão preventiva | `PATCH /api/admin/prestadores/:id/suspensao` (status `suspenso`, motivo visível ao próprio prestador) |
+| Relatório | `GET /api/admin/relatorio?de=&ate=` |
+| Registro das decisões | tabela `acoes_administrador` e `GET /api/admin/acoes` |
+
+O perfil `administrador` entrou em `usuarios.tipo_perfil`. Ninguém vira administrador pelo cadastro do site: a conta é criada por `npm run admin:criar -- --email ... --senha ...`.
+
+### US19 - Proposta complementar
+
+| No cartão | Onde está |
+|---|---|
+| Justificativa e foto obrigatórias | `POST /api/servicos/:id/complementar` (multipart `valor`, `justificativa`, `foto`) |
+| Máx. 50% do original e uma por serviço | `servicos/complementar.js` (sobre o valor do serviço, sem o deslocamento); índice único em `propostas_complementares.servico_id` |
+| Pix adicional retido após aceite | `POST .../complementar/aceitar` gera um `Pagamento` com `tipo = 'complementar'`; o webhook o deixa `retido` junto com o original; a confirmação (US20) repassa os dois com a mesma taxa |
+| Métrica no perfil | `complementares: { servicos, propostas, percentual }` na busca e em Meu perfil |
+
+**Pagamento principal e complementar.** `Pagamento` ganhou a coluna `tipo` e um escopo padrão que traz só o principal. Assim, todo o fluxo das sprints anteriores (aceite, cancelamento, tela do serviço) continua olhando o pagamento do orçamento sem mudança. Quem precisa dos dois usa `Pagamento.unscoped()`: webhook, repasse, disputa, extrato e pendências.
+
+### US22 - Extrato do prestador
+
+| No cartão | Onde está |
+|---|---|
+| Extrato com filtro por período | `GET /api/prestadores/extrato?de=AAAA-MM-DD&ate=AAAA-MM-DD` (horário de Brasília; vale a data do repasse) |
+| Bruto, taxa e líquido por serviço | `controllers/extratoController.js`: uma linha por serviço (o complementar soma na mesma linha) |
+| Totais e retidos | `totais` é a soma das linhas; `retidos` traz o que ainda está congelado, fora dos totais |
+| Exportar | `GET /api/prestadores/extrato.csv` (separador `;`, vírgula decimal, BOM para o Excel) |
+
+### Decisões tomadas onde o cartão não dizia (confirmar com o grupo)
+
+| Decisão | Por quê |
+|---|---|
+| Só o contratante abre disputa; o prestador se defende | O cartão fala em "defesa do prestador" e em "o contratante não estorna sozinho" |
+| A disputa também abre com o serviço Em execução | No Sprint 4 o cancelamento ficou bloqueado em execução com a mensagem "a saída é abrir uma disputa" |
+| Prazo de 72 h = o mesmo `CONFIRMACAO_HORAS` da US20 | Depois dele o serviço já foi confirmado e o dinheiro liberado; os dois prazos andam juntos |
+| O admin decide depois da defesa ou de 48 h sem defesa | Sem isso, "o prestador responde" poderia ser atropelado pela decisão |
+| Dividir não paga taxa; liberar paga a taxa normal | Igual ao Sprint 4: multa de cancelamento sem taxa, conclusão com taxa |
+| Serviço decidido fica `resolvido` e não conta para a faixa de taxa (US21) | O cartão da US21 diz que serviço em disputa não conta |
+| Complementar só no local (Em execução, ou Aceito depois do Cheguei) | O trabalho a mais é descoberto no atendimento |
+| Complementar retido volta inteiro no cancelamento | O trabalho a mais não foi feito; o original segue a regra da US15 |
+| Proposta sem pagamento perde o efeito quando o serviço é concluído, cancelado ou vai para disputa | Evita Pix adicional pago depois de o serviço acabar |
+| Métrica = propostas ÷ serviços aceitos | Mostra com que frequência o profissional pede a mais |
+| Extrato: retidos mostram a situação de agora, sem o filtro de período | Dinheiro congelado ainda não tem data de repasse |
+| Mídias de disputa aberta não são apagadas pela rotina dos 90 dias | São a prova da decisão |
+
+### Banco de dados
+
+As tabelas novas (`disputas`, `propostas_complementares`, `acoes_administrador`) são criadas pelo `sequelize.sync()`. As colunas novas (`pagamentos.tipo`, `prestadores.suspenso_em`, `prestadores.motivo_suspensao`) entram sozinhas pelo `garantirColunas`, que agora também acrescenta valores novos de ENUM no MySQL (`usuarios.tipo_perfil` ganhou `administrador`). Ou seja: **basta reiniciar a API**. O `schema.sql` foi gerado de novo a partir dos modelos (ele estava parado no Sprint 2).
+
+### Testes
+
+`npm run teste`: **409 critérios, 0 falhas** (eram 326). São 83 novos em `testes/sprint5.js`: 25 da US23, 27 da US25, 21 da US19 e 10 da US22. Antes de entregar, três regras foram desligadas uma de cada vez (limite de 50%, prazo de 72 h, bloqueio da confirmação automática) e os testes correspondentes falharam. O build do front compila sem erros, e as telas foram conferidas no navegador com os dados de demonstração, no computador e no celular.
+
+### Demonstração
+
+`npm run db:demo -- --recriar` agora também cria (arquivo `src/database/demo-sprint5.js`): a conta `admin.demo@fecho.app`, uma disputa aberta com defesa e fotos para decidir ao vivo, um serviço concluído há 2 horas para abrir disputa ao vivo, uma proposta complementar esperando aceite, um serviço pago com complementar e uma disputa já decidida (para o relatório e o registro). As fotos são PNGs gerados pelo script. `npm run pix:pagar` também paga o Pix complementar.
+
+### Arquivos
+
+- Backend novos: `models/Disputa.js`, `models/PropostaComplementar.js`, `models/AcaoAdministrador.js`, `servicos/disputas.js`, `servicos/complementar.js`, `controllers/disputaController.js`, `controllers/adminController.js`, `controllers/extratoController.js`, `database/demo-sprint5.js`, `scripts/admin-criar.js`, `testes/sprint5.js`
+- Backend alterados: `models/Pagamento.js`, `Prestador.js`, `Servico.js`, `Usuario.js`, `index.js`, `servicos/repasse.js`, `cobrancas.js`, `cancelamento.js`, `pendencias.js`, `retencaoMidias.js`, `controllers/servicoController.js`, `execucaoController.js`, `prestadorController.js`, `routes/index.js`, `database/colunas.js`, `database/demo.js`, `scripts/pix-pagar.js`, `testes/criterios.js`, `schema.sql`, `package.json`
+- Frontend novos: `componentes/DisputaComplementar.jsx` e `.css`, `paginas/Extrato.jsx` e `extrato.css`, `paginas/Admin.jsx`, `paginas/AdminDisputa.jsx` e `admin.css`
+- Frontend alterados: `App.jsx`, `servicos/api.js`, `componentes/Cabecalho.jsx`, `ImagemProtegida.jsx`, `paginas/Entrar.jsx`, `MeuPerfil.jsx`, `Prestadores.jsx`, `ServicoDetalhe.jsx`, `Servicos.jsx`, `servicos.css`
+
+### Em aberto
+
+- **Notas do Planning Poker** dos quatro cards.
+- **Decisões acima**, principalmente as 48 h de defesa e o "dividir sem taxa".

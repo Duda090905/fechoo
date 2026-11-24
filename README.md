@@ -1,6 +1,21 @@
-# Fechô — Sprint 4
+# Fechô — projeto completo (Sprints 1 a 5)
 
-Plataforma de contratação de serviços com pagamento retido. Este repositório cobre o **Sprint 1** (identidade, perfil e listagem, 25 pontos), o **Sprint 2** (encontrar e combinar o serviço, 32), o **Sprint 3** (fechar o serviço: aceite, Pix congelado e selo, 29) e o **Sprint 4** (depois do aceite: conclusão e repasse, taxa, cancelamento, nova data, avaliação e histórico, 35).
+Plataforma de contratação de serviços com pagamento retido. Este repositório cobre o **Sprint 1** (identidade, perfil e listagem, 25 pontos), o **Sprint 2** (encontrar e combinar o serviço, 32), o **Sprint 3** (fechar o serviço: aceite, Pix congelado e selo, 29) o **Sprint 4** (depois do aceite: conclusão e repasse, taxa, cancelamento, nova data, avaliação e histórico, 35) e o **Sprint 5**, o final (quando algo dá errado e o lado de quem administra: disputa, painel do administrador, valor complementar e extrato). Com ele, as 25 histórias do backlog e o curinga US26 estão entregues.
+
+### Sprint 5 (final)
+
+| Nº | História | O que entrega |
+|---|---|---|
+| US23 | Abertura de disputa | O cliente abre a disputa (serviço em execução ou até 72 h depois de concluído) com justificativa e fotos; o dinheiro fica congelado, a confirmação automática para e o profissional é avisado e se defende |
+| US25 | Painel do administrador | Fila de disputas com as evidências, o chat e a ficha das partes; decisão devolver / liberar / dividir com justificativa, que gera o estorno ou a transferência; suspensão preventiva; relatório; registro de cada decisão |
+| US19 | Proposta complementar | No local, o profissional pede um valor a mais (até 50%, uma vez, com foto e justificativa); aceito, vira um Pix adicional congelado junto com o original; a frequência aparece no perfil |
+| US22 | Extrato do prestador | Por período: bruto, taxa e líquido de cada serviço, totais que conferem com as linhas, valores ainda congelados à parte e exportação em CSV |
+
+Cada critério, com o teste e o passo na tela, está no `Checklist Sprint 5 Fechô.md`; o que mudou e as decisões, no `ALTERACOES.md`.
+
+**Caminho com disputa.** Em execução ou Concluído → **Em disputa** (dinheiro congelado) → defesa do profissional (48 h) → decisão do administrador → **Resolvido**. *Devolver* estorna tudo ao cliente; *liberar* repassa ao profissional com a taxa normal; *dividir* devolve X% ao cliente e manda o resto ao profissional, sem taxa (como a multa de cancelamento).
+
+**Administrador.** Não existe cadastro de administrador pelo site. Crie a conta com `npm run admin:criar -- --nome "Equipe Fechô" --email admin@fecho.app --senha "umaSenhaForte1"` e entre pela tela normal de login: o menu mostra o **Painel**.
 
 ### Sprint 4
 
@@ -105,7 +120,8 @@ cd backend
 npm install
 cp .env.example .env     # preencha DB_USER e DB_PASS
 npm run db:seed          # carrega áreas, categorias e bairros
-npm run db:demo          # (opcional) contas e serviços de demonstração (Sprints 2 e 3)
+npm run db:demo          # (opcional) contas e serviços de demonstração (Sprints 2 a 5)
+npm run admin:criar -- --email admin@fecho.app --senha umaSenhaForte1   # conta de administrador (US25)
 npm run dev              # http://localhost:3333
 ```
 
@@ -125,7 +141,7 @@ cd backend
 npm run teste
 ```
 
-Sobe a API em um banco em memória e verifica os critérios de aceite dos três sprints, história por história (242 verificações). O pagamento roda no gateway simulado, sem internet. Não precisa do MySQL rodando. É o jeito mais rápido de demonstrar o sprint na apresentação.
+Sobe a API em um banco em memória e verifica os critérios de aceite dos cinco sprints, história por história (409 verificações). O pagamento roda no gateway simulado, sem internet. Não precisa do MySQL rodando. É o jeito mais rápido de demonstrar o sprint na apresentação.
 
 ---
 
@@ -165,6 +181,21 @@ Sobe a API em um banco em memória e verifica os critérios de aceite dos três 
 | POST | `/api/pagamentos/webhook` | US18 (aviso do gateway; vale o token `asaas-access-token`) | não (token) |
 | GET | `/api/notificacoes` | US11, US18 (avisos da própria pessoa) | sim |
 | POST | `/api/notificacoes/lidas` | US11, US18 | sim |
+| POST | `/api/servicos/:id/disputa` | US23 (justificativa + até 3 fotos) | sim (contratante do serviço) |
+| POST | `/api/servicos/:id/disputa/defesa` | US23 (defesa + até 3 fotos) | sim (prestador do serviço) |
+| POST | `/api/servicos/:id/complementar` | US19 (valor, justificativa e foto) | sim (prestador do serviço) |
+| POST | `/api/servicos/:id/complementar/aceitar` | US19 (gera o Pix adicional) | sim (contratante do serviço) |
+| POST | `/api/servicos/:id/complementar/recusar` | US19 | sim (contratante do serviço) |
+| GET | `/api/prestadores/extrato?de=&ate=` | US22 | sim (prestador) |
+| GET | `/api/prestadores/extrato.csv?de=&ate=` | US22 (exportar) | sim (prestador) |
+| GET | `/api/admin/disputas?status=` | US25 (fila) | sim (administrador) |
+| GET | `/api/admin/disputas/:id` | US25 (evidências, chat, histórico, partes) | sim (administrador) |
+| GET | `/api/admin/disputas/:id/arquivos/:nome` | US25 (fotos) | sim (administrador) |
+| POST | `/api/admin/disputas/:id/decisao` | US25 (devolver, liberar, dividir) | sim (administrador) |
+| GET | `/api/admin/prestadores?busca=` | US25 | sim (administrador) |
+| PATCH | `/api/admin/prestadores/:id/suspensao` | US25 (suspender ou reativar) | sim (administrador) |
+| GET | `/api/admin/relatorio?de=&ate=` | US25 | sim (administrador) |
+| GET | `/api/admin/acoes` | US25 (registro das decisões) | sim (administrador) |
 
 ---
 
@@ -248,7 +279,7 @@ A anonimização mantém o registro da conta (para o que a lei exige guardar, co
 3. **Retenção de conta inativa.** Implementada com 12 meses e aviso 30 dias antes (recomendação do grupo). Confirmar o prazo com o cliente e escrevê-lo nos termos de uso.
 4. **Fotos em disco.** Servem para desenvolvimento e apresentação; em hospedagem real, usar armazenamento externo.
 5. **Migrations.** O projeto usa `sequelize.sync()`, que resolve em desenvolvimento. Para produção o certo é migração versionada.
-6. **Avaliações.** A nota média da busca depende da US24.
+6. **Decisões do Sprint 5 a confirmar.** 48 horas para a defesa antes da decisão, "dividir" sem taxa e a métrica de complementar (propostas ÷ serviços aceitos). Ver `ALTERACOES.md`.
 7. **Prazo de guarda das mídias do chat (90 dias).** Proposta técnica a confirmar pelo grupo.
 8. **Pix pago depois de recusado ou fora do fluxo.** Fica registrado em `eventos_webhook` com o resultado `servico_fora_do_fluxo` e um aviso no console; a devolução do dinheiro é a US15 (cancelamento e estorno) ou a US25 (administrador).
 9. **CPF em texto puro.** O cadastro guarda o CPF sem a proteção por HMAC (ela foi revertida antes do Sprint 2). A US06 compara a chave Pix com esse CPF e o Asaas precisa dele para criar o cliente. Se o grupo voltar com o HMAC, a comparação da US06 continua igual (compara as impressões), mas a criação do cliente no Asaas vai precisar pedir o CPF no primeiro pagamento.

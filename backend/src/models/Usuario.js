@@ -31,7 +31,9 @@ class Usuario extends Model {
       aviso_retencao_em: { type: DataTypes.DATE, allowNull: true },
       desativado_em: { type: DataTypes.DATE, allowNull: true },
       reativado_em: { type: DataTypes.DATE, allowNull: true },
-      excluido_em: { type: DataTypes.DATE, allowNull: true }
+      excluido_em: { type: DataTypes.DATE, allowNull: true },
+      // US17 - id do cliente no Asaas (cus_...), criado na primeira cobranca.
+      asaas_cliente_id: { type: DataTypes.STRING(40), allowNull: true }
     }, { sequelize, tableName: 'usuarios' });
   }
 

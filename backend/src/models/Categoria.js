@@ -13,8 +13,8 @@ class Categoria extends Model {
   static associate(models) {
     this.belongsTo(models.Area, { foreignKey: 'area_id', as: 'area' });
     this.belongsToMany(models.Prestador, {
-      through: 'prestador_categorias', foreignKey: 'categoria_id',
-      otherKey: 'prestador_id', as: 'prestadores', timestamps: false
+      through: { model: models.PrestadorCategoria, unique: false }, foreignKey: 'categoria_id',
+      otherKey: 'prestador_id', as: 'prestadores'
     });
   }
 }

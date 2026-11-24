@@ -1,4 +1,4 @@
--- Fecho - Sprint 1
+-- Fecho - Sprint 2
 -- Este arquivo e uma referencia do modelo. A aplicacao cria as tabelas
 -- sozinha ao iniciar (sequelize.sync). Use este script se preferir
 -- criar o banco manualmente antes de rodar a API.
@@ -71,9 +71,14 @@ CREATE TABLE prestadores (
   status ENUM('ativo','pausado','suspenso') DEFAULT 'ativo',
   pausado_em DATETIME,
   atende_apenas_mulheres BOOLEAN DEFAULT FALSE,
+  -- US09: a busca ordena pela nota e o cartao a exibe; quem calcula e a US24
+  nota_media DECIMAL(3,2),
+  -- US09: selo no cartao da busca; quem verifica e a US06
+  verificado BOOLEAN NOT NULL DEFAULT FALSE,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+  -- US09: indice do filtro de status da busca
   INDEX idx_prestadores_status (status)
 );
 
@@ -82,7 +87,9 @@ CREATE TABLE prestador_categorias (
   categoria_id INT NOT NULL,
   PRIMARY KEY (prestador_id, categoria_id),
   FOREIGN KEY (prestador_id) REFERENCES prestadores(id),
-  FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+  FOREIGN KEY (categoria_id) REFERENCES categorias(id),
+  -- US09: indice do filtro de categoria da busca
+  INDEX idx_prestador_categorias_categoria (categoria_id, prestador_id)
 );
 
 CREATE TABLE prestador_bairros (
@@ -90,7 +97,9 @@ CREATE TABLE prestador_bairros (
   bairro_id INT NOT NULL,
   PRIMARY KEY (prestador_id, bairro_id),
   FOREIGN KEY (prestador_id) REFERENCES prestadores(id),
-  FOREIGN KEY (bairro_id) REFERENCES bairros(id)
+  FOREIGN KEY (bairro_id) REFERENCES bairros(id),
+  -- US09: indice do filtro de bairro da busca
+  INDEX idx_prestador_bairros_bairro (bairro_id, prestador_id)
 );
 
 -- US07: um registro por pausa; fim vazio = pausa em andamento
@@ -126,4 +135,50 @@ CREATE TABLE solicitacoes_exclusao (
   created_at DATETIME NOT NULL,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
   INDEX idx_solicitacoes_usuario (usuario_id)
+);
+
+-- US10: pedido de servico e orcamento; US13: data e hora; US12: encerramento e midias.
+-- Os tres primeiros status sao os da US10; os demais sao da maquina de estados
+-- e passam a ser usados pelas proximas historias.
+CREATE TABLE servicos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  id_contratante INT NOT NULL,
+  id_prestador INT NOT NULL,
+  -- bairro onde o servico sera feito: define se cabe taxa de deslocamento
+  bairro_id INT NOT NULL,
+  descricao TEXT NOT NULL,
+  -- nomes dos arquivos das fotos do pedido (pasta privada uploads/servicos)
+  fotos JSON,
+  data_hora_solicitada DATETIME NOT NULL,
+  data_hora_proposta DATETIME,
+  valor DECIMAL(10,2),
+  -- duracao estimada em horas: ocupa a agenda do prestador (US13)
+  prazo_horas INT,
+  taxa_deslocamento DECIMAL(10,2),
+  status ENUM('aguardando_orcamento','orcamento_enviado','recusado','aceito','em_execucao','concluido',
+    'confirmado','pago','cancelado','em_disputa','resolvido','expirado') NOT NULL DEFAULT 'aguardando_orcamento',
+  orcamento_enviado_em DATETIME,
+  -- quando encerrou: o chat fecha e conta o prazo de guarda das midias
+  encerrado_em DATETIME,
+  midias_removidas_em DATETIME,
+  lembrete_enviado_em DATETIME,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  FOREIGN KEY (id_contratante) REFERENCES usuarios(id),
+  FOREIGN KEY (id_prestador) REFERENCES prestadores(id),
+  FOREIGN KEY (bairro_id) REFERENCES bairros(id)
+);
+
+-- US12: mensagens do chat, sem edicao nem exclusao pelo usuario
+CREATE TABLE mensagens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  servico_id INT NOT NULL,
+  autor_id INT NOT NULL,
+  texto TEXT,
+  -- nome do arquivo na pasta privada uploads/servicos
+  imagem VARCHAR(64),
+  imagem_removida_em DATETIME,
+  created_at DATETIME NOT NULL,
+  FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE RESTRICT,
+  FOREIGN KEY (autor_id) REFERENCES usuarios(id)
 );

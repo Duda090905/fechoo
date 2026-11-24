@@ -19,12 +19,16 @@ const Notificacao = require('./Notificacao');
 const Reagendamento = require('./Reagendamento');
 const Avaliacao = require('./Avaliacao');
 const HistoricoServico = require('./HistoricoServico');
+const Disputa = require('./Disputa');
+const PropostaComplementar = require('./PropostaComplementar');
+const AcaoAdministrador = require('./AcaoAdministrador');
 
 const models = {
   Usuario, Prestador, Area, Categoria, Bairro, TokenSenha, Pausa, SolicitacaoExclusao,
   PrestadorCategoria, PrestadorBairro, Servico, Mensagem,
   Pagamento, EventoWebhook, AcessoEndereco, Notificacao,
-  Reagendamento, Avaliacao, HistoricoServico
+  Reagendamento, Avaliacao, HistoricoServico,
+  Disputa, PropostaComplementar, AcaoAdministrador
 };
 
 Object.values(models).forEach((model) => model.init(sequelize));

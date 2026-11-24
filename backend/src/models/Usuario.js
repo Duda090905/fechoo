@@ -12,7 +12,9 @@ class Usuario extends Model {
       senha_hash: { type: DataTypes.STRING(120), allowNull: true },
       // US08 - preenchimento opcional, usado apenas pelo filtro de seguranca.
       sexo: { type: DataTypes.ENUM('feminino', 'masculino', 'nao_informado'), defaultValue: 'nao_informado' },
-      tipo_perfil: { type: DataTypes.ENUM('contratante', 'prestador'), allowNull: false },
+      // US25 - administrador: nao se cadastra pelo site; a conta e criada pelo
+      // script npm run admin:criar.
+      tipo_perfil: { type: DataTypes.ENUM('contratante', 'prestador', 'administrador'), allowNull: false },
       // ativo    - usa a plataforma normalmente
       // inativo  - conta desativada pela propria pessoa; dados preservados,
       //            perfil fora do ar

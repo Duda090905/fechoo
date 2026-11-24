@@ -13,7 +13,7 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
-  sequelize, Servico, Pagamento, EventoWebhook, Notificacao, Usuario, Prestador, HistoricoServico
+  sequelize, Servico, Pagamento, EventoWebhook, Notificacao, Usuario, Prestador, HistoricoServico, PropostaComplementar
 } = require('../models');
 const gateway = require('./gateway');
 const { enviarAvisoServico } = require('../utils/email');
@@ -66,7 +66,8 @@ async function pagamentoDoServico(servicoId, agora = new Date()) {
 
 // Rotina: encerra as cobrancas vencidas de todos os servicos.
 async function expirarCobrancas(agora = new Date()) {
-  const vencidas = await Pagamento.findAll({
+  // US19 - inclui o Pix adicional da proposta complementar.
+  const vencidas = await Pagamento.unscoped().findAll({
     where: { status: 'aguardando', expirado_em: null, expira_em: { [Op.lte]: agora } }
   });
   for (const pagamento of vencidas) await encerrarSeVencida(pagamento, agora);
@@ -86,18 +87,24 @@ function iniciarRotinaCobrancas() {
  * US17 - gera a cobranca Pix de um servico com orcamento.
  * Valor = exatamente o total do orcamento aceito (servico + deslocamento).
  */
-async function gerarCobranca(servico, contratante, agora = new Date()) {
-  const valor = emReais(Number(servico.valor) + Number(servico.taxa_deslocamento || 0));
+async function gerarCobranca(servico, contratante, agora = new Date(), { complementar = null } = {}) {
+  // US19 - o Pix adicional tem o valor da proposta complementar aceita.
+  const valor = complementar
+    ? emReais(complementar.valor)
+    : emReais(Number(servico.valor) + Number(servico.taxa_deslocamento || 0));
   // Identificador unico, vinculado ao servico: vai e volta pelo gateway.
-  const identificador = `fecho-s${servico.id}-${crypto.randomBytes(4).toString('hex')}`;
+  const identificador = `fecho-s${servico.id}${complementar ? 'c' : ''}-${crypto.randomBytes(4).toString('hex')}`;
   const cobranca = await gateway.criarCobrancaPix({
     contratante,
     valor,
     identificador,
-    descricao: `Fechô - serviço ${servico.id}: ${servico.descricao}`
+    descricao: complementar
+      ? `Fechô - serviço ${servico.id}: valor complementar`
+      : `Fechô - serviço ${servico.id}: ${servico.descricao}`
   });
   return Pagamento.create({
     servico_id: servico.id,
+    tipo: complementar ? 'complementar' : 'principal',
     valor,
     status: 'aguardando',
     identificador,
@@ -149,6 +156,27 @@ async function criarAvisos(servico, transaction) {
   return avisos;
 }
 
+// US19 - aviso ao prestador de que o Pix complementar caiu.
+async function avisosComplementar(servico, pagamento, transaction) {
+  const prestador = await Prestador.findByPk(servico.id_prestador, {
+    transaction, include: [{ model: Usuario, as: 'usuario', attributes: ['id', 'nome', 'email'] }]
+  });
+  if (!prestador || !prestador.usuario) return [];
+  const aviso = {
+    usuario: prestador.usuario,
+    tipo: 'complementar_pago',
+    titulo: 'Valor complementar garantido',
+    texto: `O cliente pagou o valor complementar de R$ ${Number(pagamento.valor).toFixed(2).replace('.', ',')}. `
+      + 'Ele fica congelado junto com o pagamento original até a confirmação do serviço.'
+  };
+  await Notificacao.findOrCreate({
+    where: { usuario_id: aviso.usuario.id, servico_id: servico.id, tipo: aviso.tipo },
+    defaults: { titulo: aviso.titulo, texto: aviso.texto },
+    transaction
+  });
+  return [aviso];
+}
+
 /**
  * US18 - aplica um aviso do gateway. Devolve o resultado (texto curto).
  *
@@ -178,7 +206,7 @@ async function aplicarEvento({ eventoId, tipo, cobrancaId, referencia, valor }, 
     }
 
     const pagamento = cobrancaId
-      ? await Pagamento.findOne({ where: { cobranca_id: cobrancaId }, transaction })
+      ? await Pagamento.unscoped().findOne({ where: { cobranca_id: cobrancaId }, transaction })
       : null;
 
     if (!EVENTOS_PAGO.includes(tipo)) {
@@ -192,6 +220,35 @@ async function aplicarEvento({ eventoId, tipo, cobrancaId, referencia, valor }, 
       resultado = 'valor_nao_confere';
     } else if (pagamento.status !== 'aguardando') {
       resultado = 'ja_processado';
+    } else if (pagamento.tipo === 'complementar') {
+      // US19 - Pix adicional: fica congelado junto com o original.
+      const servico = await Servico.findByPk(pagamento.servico_id, { transaction });
+      const proposta = await PropostaComplementar.findOne({ where: { servico_id: pagamento.servico_id }, transaction });
+      if (!servico || !['aceito', 'em_execucao'].includes(servico.status) || !proposta || proposta.status !== 'aceita') {
+        resultado = 'servico_fora_do_fluxo';
+      } else {
+        pagamento.status = 'retido';
+        pagamento.retido_em = agora;
+        await pagamento.save({ transaction });
+        proposta.status = 'paga';
+        proposta.paga_em = agora;
+        await proposta.save({ transaction });
+        await HistoricoServico.create({
+          servico_id: servico.id, acao: 'complementar_pago',
+          detalhe: `O banco confirmou o Pix complementar de R$ ${Number(pagamento.valor).toFixed(2).replace('.', ',')}: congelado junto com o original`
+        }, { transaction });
+        avisos = await avisosComplementar(servico, pagamento, transaction);
+        outrasCobrancas = await Pagamento.unscoped().findAll({
+          where: { servico_id: servico.id, tipo: 'complementar', status: 'aguardando', expirado_em: null, id: { [Op.ne]: pagamento.id } },
+          transaction
+        });
+        for (const outra of outrasCobrancas) {
+          outra.expira_em = agora;
+          outra.expirado_em = agora;
+          await outra.save({ transaction });
+        }
+        resultado = 'complementar_retido';
+      }
     } else {
       const servico = await Servico.findByPk(pagamento.servico_id, { transaction });
       if (!servico || servico.status !== 'orcamento_enviado') {

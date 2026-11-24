@@ -20,6 +20,7 @@ const { registrar } = require('../servicos/historico');
 const { avisar } = require('../servicos/avisos');
 const { GatewayErro } = require('../servicos/gateway');
 const { formatarDataHora } = require('../utils/datas');
+const { encerrarProposta } = require('../servicos/complementar');
 
 const HORA_MS = 60 * 60 * 1000;
 // US20 / US15 - o prestador so inicia ou avisa que chegou a partir de 1 hora
@@ -134,6 +135,8 @@ async function concluir(req, res, next) {
     servico.status = 'concluido';
     servico.concluido_em = new Date();
     await servico.save(); // o hook do modelo fecha o chat (US12)
+    // US19 - proposta complementar sem resposta ou sem pagamento deixa de valer.
+    await encerrarProposta(servico.id);
     await registrar(servico.id, { usuarioId: req.usuario.id, acao: 'conclusao', de: 'em_execucao', para: 'concluido' });
     const horas = horasParaConfirmar();
     await avisar({

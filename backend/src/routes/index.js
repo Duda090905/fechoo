@@ -8,12 +8,15 @@ const pagamento = require('../controllers/pagamentoController');
 const notificacao = require('../controllers/notificacaoController');
 const execucao = require('../controllers/execucaoController');
 const avaliacao = require('../controllers/avaliacaoController');
+const disputa = require('../controllers/disputaController');
+const admin = require('../controllers/adminController');
+const extrato = require('../controllers/extratoController');
 const { autenticar, apenasPerfil, exigirAtivo } = require('../middlewares/auth');
 const { receberFoto, receberFotosPedido, receberImagemChat } = require('../middlewares/upload');
 
 const rotas = Router();
 
-rotas.get('/', (req, res) => res.json({ api: 'Fecho', sprint: 4 }));
+rotas.get('/', (req, res) => res.json({ api: 'Fecho', sprint: 5 }));
 
 // US01, US02, US03
 rotas.post('/auth/register', auth.cadastrar);
@@ -47,6 +50,9 @@ rotas.put('/prestadores/meu-perfil', autenticar, exigirAtivo, apenasPerfil('pres
 rotas.put('/prestadores/foto', autenticar, exigirAtivo, apenasPerfil('prestador'), receberFoto, prestador.enviarFoto);
 rotas.delete('/prestadores/foto', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.removerFoto);
 rotas.patch('/prestadores/pausa', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.alternarPausa);
+// US22 - extrato do prestador (e exportacao em CSV)
+rotas.get('/prestadores/extrato', autenticar, exigirAtivo, apenasPerfil('prestador'), extrato.extrato);
+rotas.get('/prestadores/extrato.csv', autenticar, exigirAtivo, apenasPerfil('prestador'), extrato.extratoCsv);
 // US06 - chave Pix e selo de identidade verificada
 rotas.put('/prestadores/chave-pix', autenticar, exigirAtivo, apenasPerfil('prestador'), prestador.cadastrarChavePix);
 
@@ -76,6 +82,13 @@ rotas.post('/servicos/:id/reagendamentos/:rid/responder', autenticar, exigirAtiv
 rotas.post('/servicos/:id/avaliacao', autenticar, exigirAtivo, avaliacao.avaliar);
 rotas.put('/servicos/:id/avaliacao', autenticar, exigirAtivo, avaliacao.editar);
 rotas.post('/servicos/:id/avaliacao/resposta', autenticar, exigirAtivo, avaliacao.responder);
+// US23 - disputa (o cliente abre; o profissional se defende)
+rotas.post('/servicos/:id/disputa', autenticar, exigirAtivo, receberFotosPedido, disputa.abrirDisputa);
+rotas.post('/servicos/:id/disputa/defesa', autenticar, exigirAtivo, receberFotosPedido, disputa.defenderDisputa);
+// US19 - proposta complementar (foto obrigatoria)
+rotas.post('/servicos/:id/complementar', autenticar, exigirAtivo, receberFoto, disputa.proporComplementar);
+rotas.post('/servicos/:id/complementar/aceitar', autenticar, exigirAtivo, disputa.aceitarComplementar);
+rotas.post('/servicos/:id/complementar/recusar', autenticar, exigirAtivo, disputa.recusarComplementar);
 rotas.get('/servicos/:id/arquivos/:nome', autenticar, exigirAtivo, servico.arquivo);
 rotas.get('/servicos/:id/mensagens', autenticar, exigirAtivo, servico.mensagens);
 rotas.post('/servicos/:id/mensagens', autenticar, exigirAtivo, receberImagemChat, servico.enviarMensagem);
@@ -83,5 +96,16 @@ rotas.post('/servicos/:id/mensagens', autenticar, exigirAtivo, receberImagemChat
 // US11 / US18 - avisos dentro do app
 rotas.get('/notificacoes', autenticar, exigirAtivo, notificacao.listar);
 rotas.post('/notificacoes/lidas', autenticar, exigirAtivo, notificacao.marcarLidas);
+
+// US25 - painel do administrador (so o perfil administrador entra)
+const soAdmin = [autenticar, exigirAtivo, apenasPerfil('administrador')];
+rotas.get('/admin/disputas', ...soAdmin, admin.fila);
+rotas.get('/admin/disputas/:id', ...soAdmin, admin.detalhe);
+rotas.get('/admin/disputas/:id/arquivos/:nome', ...soAdmin, admin.arquivo);
+rotas.post('/admin/disputas/:id/decisao', ...soAdmin, admin.decidir);
+rotas.get('/admin/prestadores', ...soAdmin, admin.prestadores);
+rotas.patch('/admin/prestadores/:id/suspensao', ...soAdmin, admin.suspensao);
+rotas.get('/admin/acoes', ...soAdmin, admin.acoes);
+rotas.get('/admin/relatorio', ...soAdmin, admin.relatorio);
 
 module.exports = rotas;

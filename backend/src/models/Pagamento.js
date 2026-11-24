@@ -11,6 +11,12 @@ const { DataTypes, Model } = require('sequelize');
  *
  * O gateway e o cofre: o dinheiro fica na conta do Asaas. Quem decide quando
  * liberar e o sistema (retencao logica).
+ *
+ * US19 - tipo: 'principal' (o orcamento aceito) ou 'complementar' (o Pix
+ * adicional da proposta complementar). O escopo padrao traz so o principal,
+ * para que todo o fluxo das sprints anteriores (aceite, cancelamento, tela
+ * do servico) continue olhando o pagamento do orcamento. Quem precisa dos
+ * dois usa Pagamento.unscoped() (webhook, repasse, disputa, extrato).
  */
 const STATUS = ['aguardando', 'retido', 'liberado', 'estornado'];
 
@@ -19,6 +25,7 @@ class Pagamento extends Model {
     return super.init({
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       servico_id: { type: DataTypes.INTEGER, allowNull: false },
+      tipo: { type: DataTypes.STRING(12), allowNull: false, defaultValue: 'principal' },
       // Exatamente o total do orcamento aceito (servico + deslocamento).
       valor: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
       status: { type: DataTypes.ENUM(...STATUS), allowNull: false, defaultValue: 'aguardando' },
@@ -62,6 +69,7 @@ class Pagamento extends Model {
     }, {
       sequelize,
       tableName: 'pagamentos',
+      defaultScope: { where: { tipo: 'principal' } },
       indexes: [{ name: 'idx_pagamentos_servico', fields: ['servico_id'] }]
     });
   }

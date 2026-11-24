@@ -144,6 +144,11 @@ async function cancelar(servico, { papel, usuarioId, motivo, agora = new Date() 
     }
   }
 
+  // US19 - o Pix complementar congelado volta inteiro ao contratante (o
+  // trabalho a mais nao foi feito); proposta sem pagamento deixa de valer.
+  const { devolverNoCancelamento } = require('./complementar');
+  conta.valor_complementar_devolvido = await devolverNoCancelamento(servico, agora);
+
   // US14 - reagendamento esperando resposta deixa de valer.
   await Reagendamento.update(
     { status: 'cancelado', respondido_em: agora },
@@ -162,7 +167,9 @@ async function cancelar(servico, { papel, usuarioId, motivo, agora = new Date() 
     ? `Motivo: ${motivo}`
     : `${conta.percentual_contratante}% (${dinheiro(conta.valor_contratante)}) devolvido ao cliente e `
       + `${conta.percentual_prestador}% (${dinheiro(conta.valor_prestador)}) ao profissional. Motivo: ${motivo}`;
-  await registrar(servico.id, { usuarioId, acao: 'cancelamento', de: statusAnterior, para: 'cancelado', detalhe });
+  const extra = conta.valor_complementar_devolvido > 0
+    ? ` O valor complementar (${dinheiro(conta.valor_complementar_devolvido)}) foi devolvido inteiro ao cliente.` : '';
+  await registrar(servico.id, { usuarioId, acao: 'cancelamento', de: statusAnterior, para: 'cancelado', detalhe: detalhe + extra });
 
   const outroId = papel === 'contratante'
     ? (await carregarPrestador(servico.id_prestador)).usuario_id

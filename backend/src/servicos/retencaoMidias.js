@@ -11,7 +11,7 @@
  * A rotina roda ao iniciar a API e uma vez por dia.
  */
 const { Op } = require('sequelize');
-const { Servico, Mensagem } = require('../models');
+const { Servico, Mensagem, Disputa, PropostaComplementar } = require('../models');
 const { removerArquivoServico } = require('./armazenamento');
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -30,6 +30,10 @@ async function processarRetencaoMidias(agora = new Date()) {
   let servicos = 0;
   for (const servico of vencidos) {
     try {
+      // Sprint 5 - disputa ainda aberta segura as midias: sao a prova para a
+      // decisao do administrador (US25).
+      const disputa = await Disputa.findOne({ where: { servico_id: servico.id } });
+      if (disputa && disputa.status === 'aberta') continue;
       const comImagem = await Mensagem.findAll({
         where: { servico_id: servico.id, imagem: { [Op.ne]: null } }
       });
@@ -41,6 +45,15 @@ async function processarRetencaoMidias(agora = new Date()) {
       }
       for (const foto of servico.fotos) await removerArquivoServico(foto);
       servico.fotos = [];
+      // Sprint 5 - evidencias da disputa (US23) e foto da complementar (US19).
+      if (disputa) {
+        for (const nome of [...disputa.evidencias, ...disputa.defesa_evidencias]) await removerArquivoServico(nome);
+        disputa.evidencias = [];
+        disputa.defesa_evidencias = [];
+        await disputa.save();
+      }
+      const proposta = await PropostaComplementar.findOne({ where: { servico_id: servico.id } });
+      if (proposta && proposta.foto) await removerArquivoServico(proposta.foto);
       servico.midias_removidas_em = agora;
       await servico.save();
       servicos += 1;

@@ -6,6 +6,7 @@ const { cpfValido, limpar } = require('../utils/cpf');
 
 const { MINIMO_PARA_BUSCA } = require('../servicos/avaliacoes');
 const { faixaDoPrestador } = require('../servicos/taxa');
+const { metricaDosPrestadores } = require('../servicos/complementar');
 
 const LIMITE_CATEGORIAS = 5;
 
@@ -17,7 +18,9 @@ function chaveMascarada(chave) {
 
 // US09 - o cartao do prestador leva nome, nota media, servicos concluidos e selo.
 // `proprio`: o perfil e de quem esta logado (traz a chave Pix mascarada).
-function montarPerfil(prestador, servicosConcluidos = 0, { proprio = false } = {}) {
+// US19 - `complementares`: em quantos servicos aceitos o prestador pediu
+// valor complementar (metrica publica no perfil).
+function montarPerfil(prestador, servicosConcluidos = 0, { proprio = false, complementares = null } = {}) {
   return {
     id: prestador.id,
     nome: prestador.usuario ? prestador.usuario.nome : null,
@@ -33,10 +36,14 @@ function montarPerfil(prestador, servicosConcluidos = 0, { proprio = false } = {
     verificado: Boolean(prestador.verificado),
     categorias: (prestador.categorias || []).map((c) => ({ id: c.id, nome: c.nome })),
     bairros: (prestador.bairros || []).map((b) => ({ id: b.id, nome: b.nome })),
+    complementares: complementares || { servicos: 0, propostas: 0, percentual: 0 },
     ...(proprio
       ? {
         chave_pix: prestador.chave_pix ? { tipo: prestador.chave_pix_tipo, mascarada: chaveMascarada(prestador.chave_pix) } : null,
-        verificado_em: prestador.verificado_em
+        verificado_em: prestador.verificado_em,
+        // US25 - a propria pessoa ve por que esta suspensa
+        suspenso_em: prestador.suspenso_em,
+        motivo_suspensao: prestador.motivo_suspensao
       }
       : {})
   };
@@ -56,8 +63,12 @@ async function meuPerfil(req, res, next) {
       include: INCLUDES
     });
     if (!prestador) return res.json({ prestador: null });
-    const concluidos = await contarConcluidos([prestador.id]);
-    const perfil = montarPerfil(prestador, concluidos.get(prestador.id) || 0, { proprio: true });
+    const [concluidos, metrica] = await Promise.all([
+      contarConcluidos([prestador.id]), metricaDosPrestadores([prestador.id])
+    ]);
+    const perfil = montarPerfil(prestador, concluidos.get(prestador.id) || 0, {
+      proprio: true, complementares: metrica.get(prestador.id)
+    });
     // US21 - faixa de taxa atual e quanto falta para a proxima.
     perfil.taxa = await faixaDoPrestador(prestador.id);
     return res.json({ prestador: perfil });
@@ -351,13 +362,14 @@ async function listar(req, res, next) {
     const ids = [...new Set(elegiveis.map((p) => p.id))];
     if (!ids.length) return res.json({ prestadores: [] });
 
-    const [prestadores, concluidos] = await Promise.all([
+    const [prestadores, concluidos, metricas] = await Promise.all([
       Prestador.findAll({ where: { id: { [Op.in]: ids } }, include: INCLUDES }),
-      contarConcluidos(ids)
+      contarConcluidos(ids),
+      metricaDosPrestadores(ids)
     ]);
 
     const resultado = prestadores
-      .map((p) => montarPerfil(p, concluidos.get(p.id) || 0))
+      .map((p) => montarPerfil(p, concluidos.get(p.id) || 0, { complementares: metricas.get(p.id) }))
       .sort(ordenarParaBusca);
     return res.json({ prestadores: resultado });
   } catch (e) {

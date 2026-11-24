@@ -36,7 +36,7 @@ async function servicosEmAndamento(usuarioId) {
   if (!servicos.length) return [];
 
   const andamento = servicos.filter((s) => ['aceito', 'em_execucao', 'concluido', 'confirmado', 'em_disputa'].includes(s.status));
-  const retidos = await Pagamento.count({ where: { servico_id: servicos.map((s) => s.id), status: 'retido' } });
+  const retidos = await Pagamento.unscoped().count({ where: { servico_id: servicos.map((s) => s.id), status: 'retido' } });
   const encontradas = [];
   if (andamento.length) {
     encontradas.push({ tipo: 'servico', descricao: 'Serviço em andamento', quantidade: andamento.length });

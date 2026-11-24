@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const {
   Servico, Mensagem, Prestador, Usuario, Bairro, Categoria, Pagamento, AcessoEndereco,
-  Reagendamento, Avaliacao, HistoricoServico
+  Reagendamento, Avaliacao, HistoricoServico, Disputa, PropostaComplementar
 } = require('../models');
 const {
   detectarTipo, salvarArquivoServico, removerArquivoServico, caminhoArquivoServico, urlPublica
@@ -506,6 +506,8 @@ async function detalhar(req, res, next) {
       em: h.registrado_em
     }));
     resposta.avaliacoes = avaliacoes;
+    // US23 / US25 - disputa. US19 - proposta complementar.
+    Object.assign(resposta, await blocosSprint5(servico, servico.papel));
     // US20 - no comprovante, o prestador ve para qual chave Pix o dinheiro foi
     // (mascarada, como na US06). O cliente nao ve a chave de ninguem.
     if (servico.papel === 'prestador' && resposta.pagamento && resposta.pagamento.repasse) {
@@ -521,6 +523,66 @@ async function detalhar(req, res, next) {
   } catch (e) {
     return next(e);
   }
+}
+
+// US23 / US25 / US19 - blocos da tela do servico.
+async function blocosSprint5(servico, papel, agora = new Date()) {
+  const disputas = require('../servicos/disputas');
+  const complementar = require('../servicos/complementar');
+  const [disputa, proposta] = await Promise.all([
+    Disputa.findOne({ where: { servico_id: servico.id } }),
+    PropostaComplementar.findOne({ where: { servico_id: servico.id } })
+  ]);
+  const prazoDisputa = disputas.prazoParaAbrir(servico);
+  const bloco = {
+    pode_abrir_disputa: papel === 'contratante' && !disputa && !disputas.motivoParaNaoAbrir(servico, agora),
+    prazo_disputa: !disputa && prazoDisputa && agora <= prazoDisputa ? prazoDisputa : null,
+    disputa: disputa
+      ? {
+        id: disputa.id,
+        status: disputa.status,
+        aberta_em: disputa.aberta_em,
+        justificativa: disputa.justificativa,
+        evidencias: disputa.evidencias,
+        defesa: disputa.defesa,
+        defesa_evidencias: disputa.defesa_evidencias,
+        defesa_em: disputa.defesa_em,
+        prazo_defesa: disputas.prazoDefesa(disputa),
+        prazo_decisao: disputas.prazoDecisao(disputa),
+        decisao: disputa.decisao
+          ? {
+            tipo: disputa.decisao,
+            percentual_contratante: disputa.percentual_contratante,
+            valor_contratante: emReais(disputa.valor_contratante),
+            valor_prestador: emReais(disputa.valor_prestador),
+            justificativa: disputa.justificativa_decisao,
+            em: disputa.decidido_em
+          }
+          : null
+      }
+      : null,
+    pode_propor_complementar: papel === 'prestador' && !proposta && complementar.noLocal(servico),
+    complementar_maximo: servico.valor !== null ? complementar.valorMaximo(servico) : null,
+    complementar: null
+  };
+  if (proposta) {
+    const pagamento = await complementar.pagamentoComplementar(servico.id, agora);
+    bloco.complementar = complementar.montarProposta(proposta, pagamento, papel, montarPagamento);
+  }
+  return bloco;
+}
+
+// Arquivos (fotos) que pertencem ao servico: pedido, chat, disputa e
+// proposta complementar. Usado pela rota das partes e pela do administrador.
+async function arquivoDoServico(servico, nome) {
+  if (servico.fotos.includes(nome)) return true;
+  if ((await Mensagem.count({ where: { servico_id: servico.id, imagem: nome } })) > 0) return true;
+  const [disputa, proposta] = await Promise.all([
+    Disputa.findOne({ where: { servico_id: servico.id } }),
+    PropostaComplementar.findOne({ where: { servico_id: servico.id } })
+  ]);
+  if (disputa && (disputa.evidencias.includes(nome) || disputa.defesa_evidencias.includes(nome))) return true;
+  return Boolean(proposta && proposta.foto === nome);
 }
 
 /**
@@ -595,6 +657,11 @@ async function enviarOrcamento(req, res, next) {
     }
     if (servico.status !== 'aguardando_orcamento') {
       return res.status(409).json({ erro: 'Este pedido não está mais aguardando orçamento.' });
+    }
+    // US25 - prestador suspenso nao recebe pedido novo nem fecha orcamento.
+    const situacao = await Prestador.findByPk(servico.id_prestador, { attributes: ['status'] });
+    if (situacao && situacao.status === 'suspenso') {
+      return res.status(403).json({ erro: 'Seu perfil está suspenso pela administração. Você não pode enviar orçamentos agora.' });
     }
 
     const valor = lerDinheiro(req.body.valor);
@@ -700,8 +767,7 @@ async function arquivo(req, res, next) {
 
     const { nome } = req.params;
     const caminho = caminhoArquivoServico(nome);
-    const doServico = servico.fotos.includes(nome)
-      || (await Mensagem.count({ where: { servico_id: servico.id, imagem: nome } })) > 0;
+    const doServico = await arquivoDoServico(servico, nome);
     if (!caminho || !doServico) {
       return res.status(404).json({ erro: 'Arquivo não encontrado.' });
     }
@@ -861,5 +927,8 @@ async function historico(req, res, next) {
 
 module.exports = {
   criar, listar, agenda, detalhar, aceitar, enviarOrcamento, recusar, arquivo, mensagens, enviarMensagem, historico,
-  carregarDaParte, montarServico, horarioOcupado, lerDataHora, PRAZO_MAXIMO_HORAS
+  carregarDaParte, montarServico, horarioOcupado, lerDataHora, PRAZO_MAXIMO_HORAS,
+  // Sprint 5 - reaproveitados pela disputa, pela complementar e pelo admin
+  prepararImagens, gravarImagens, montarPagamento, montarMensagem, lerDinheiro, inteiroPositivo,
+  arquivoDoServico, blocosSprint5
 };

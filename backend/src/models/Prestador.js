@@ -26,7 +26,12 @@ class Prestador extends Model {
       // do tipo CPF, a unica cujo titular da para conferir sem consulta externa.
       chave_pix_tipo: { type: DataTypes.STRING(10), allowNull: true },
       chave_pix: { type: DataTypes.STRING(77), allowNull: true },
-      verificado_em: { type: DataTypes.DATE, allowNull: true }
+      verificado_em: { type: DataTypes.DATE, allowNull: true },
+      // US25 - suspensao preventiva pelo administrador (status 'suspenso').
+      // O registro completo (autor, data, justificativa) fica em
+      // acoes_administrador; aqui fica o que o proprio prestador ve.
+      suspenso_em: { type: DataTypes.DATE, allowNull: true },
+      motivo_suspensao: { type: DataTypes.STRING(300), allowNull: true }
     }, {
       sequelize,
       tableName: 'prestadores',

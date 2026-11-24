@@ -125,6 +125,8 @@ class Servico extends Model {
     this.hasMany(models.Reagendamento, { foreignKey: 'servico_id', as: 'reagendamentos', onDelete: 'RESTRICT' });
     this.hasMany(models.Avaliacao, { foreignKey: 'servico_id', as: 'avaliacoes', onDelete: 'RESTRICT' });
     this.hasMany(models.HistoricoServico, { foreignKey: 'servico_id', as: 'historico', onDelete: 'RESTRICT' });
+    this.hasOne(models.Disputa, { foreignKey: 'servico_id', as: 'disputa', onDelete: 'RESTRICT' });
+    this.hasOne(models.PropostaComplementar, { foreignKey: 'servico_id', as: 'complementar', onDelete: 'RESTRICT' });
   }
 
   // US13 - horario que vale: o da proposta, quando ja existe.

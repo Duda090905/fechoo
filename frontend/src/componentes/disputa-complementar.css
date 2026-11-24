@@ -1,0 +1,68 @@
+/* Sprint 5 - disputa (US23 / US25) e valor complementar (US19) na página do serviço. */
+
+.disputa__cabeca { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+.disputa__cabeca svg { flex: 0 0 auto; margin-top: 4px; color: var(--vermelho); }
+.disputa__cabeca h2 { margin: 0 0 4px; }
+.disputa__cabeca p { margin: 0; color: var(--texto-suave); font-size: 15px; }
+
+.disputa { border-color: #F0C2C2; }
+.disputa--abrir { border-style: dashed; }
+.disputa--decidida { border-color: var(--borda); }
+.disputa--decidida .disputa__cabeca svg { color: var(--azul-medio); }
+
+.disputa__lado {
+  padding: 14px 16px; border-radius: var(--raio); margin-top: 12px;
+  background: var(--fundo); border: 1px solid var(--borda);
+}
+.disputa__lado p { margin: 4px 0 0; font-size: 15px; white-space: pre-wrap; }
+.disputa__quem {
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 13px;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--texto-suave);
+}
+.disputa__nota { display: flex; gap: 6px; align-items: center; color: var(--texto-suave); font-size: 14px; margin: 4px 0 0; }
+
+.disputa__fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.disputa__foto { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; display: block; }
+
+.disputa__decisao {
+  display: grid; gap: 8px; padding: 14px 16px; border-radius: var(--raio);
+  background: var(--azul-claro); color: var(--azul-noite);
+}
+.disputa__decisao strong { font-family: var(--fonte-titulo); font-size: 17px; }
+.disputa__decisao dl { display: flex; gap: 24px; margin: 0; flex-wrap: wrap; }
+.disputa__decisao dt { font-size: 13px; color: var(--texto-suave); }
+.disputa__decisao dd { margin: 0; font-family: var(--fonte-titulo); font-weight: 600; font-size: 18px; }
+.disputa__decisao p { margin: 0; font-size: 14.5px; }
+
+/* Escolha de fotos com prévia */
+.fotos-escolha { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.fotos-escolha__item { position: relative; }
+.fotos-escolha__item img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; }
+.fotos-escolha__item button {
+  position: absolute; top: -6px; right: -6px; width: 22px; height: 22px;
+  border: 0; border-radius: 50%; background: var(--azul-noite); color: #fff; cursor: pointer; line-height: 1;
+}
+.fotos-escolha__botao {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 10px 14px; border-radius: var(--raio);
+  border: 1px dashed var(--borda-escura); color: var(--azul-medio); font-size: 14.5px;
+}
+
+/* Valor complementar */
+.complementar__texto { color: var(--texto-suave); font-size: 15px; margin: 0 0 14px; }
+.complementar__proposta { display: flex; gap: 14px; align-items: flex-start; margin: 8px 0 16px; }
+.complementar__proposta p { margin: 4px 0; font-size: 15px; }
+.complementar__proposta small { color: var(--texto-claro); font-size: 13px; }
+.complementar__foto { width: 96px; height: 96px; object-fit: cover; border-radius: 12px; display: block; }
+.complementar__valor { font-family: var(--fonte-titulo); font-size: 22px; }
+.etiqueta.complementar__status--pendente, .etiqueta.complementar__status--aceita { background: var(--amarelo-fraco); color: #7A5900; }
+.etiqueta.complementar__status--paga { background: var(--verde-fraco); color: #146B49; }
+.etiqueta.complementar__status--recusada, .etiqueta.complementar__status--encerrada { background: #EEF1F6; color: var(--texto-suave); }
+
+@media (max-width: 520px) {
+  .complementar__proposta { flex-direction: column; }
+}
+
+/* A foto vem dentro de um botao (abre ampliada): o botao fica do tamanho dela. */
+.disputa__fotos .imagem-protegida__botao,
+.complementar__proposta .imagem-protegida__botao { width: auto; flex: 0 0 auto; padding: 0; }

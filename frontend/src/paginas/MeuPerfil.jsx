@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../servicos/api';
 import { useAuth } from '../contexto/AuthContexto';
@@ -6,13 +7,111 @@ import Botao from '../componentes/Botao';
 import Aviso from '../componentes/Aviso';
 import Selecao from '../componentes/Selecao';
 import Avatar from '../componentes/Avatar';
-import { IconeEscudo, IconeBusca } from '../componentes/Icones';
+import { IconeEscudo, IconeBusca, IconeSelo } from '../componentes/Icones';
+import { cpfValido, formatarCpf } from '../utils/formatos';
 import './painel.css';
 
 const LIMITE = 5;
 const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
 const LIMITE_FOTO_MB = 2;
 const VAZIO = { descricao: '', foto_url: '', categorias: [], bairros: [], atende_apenas_mulheres: false };
+
+// US06 - verificação de identidade pela chave Pix (tipo CPF). Sem foto de
+// documento: a chave precisa ser o CPF da própria conta.
+function CartaoChavePix({ identidade, aoConfirmar }) {
+  const [trocando, setTrocando] = useState(false);
+  const [chave, setChave] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const verificado = identidade.verificado;
+
+  async function enviar(evento) {
+    evento.preventDefault();
+    setErro('');
+    if (!cpfValido(chave)) { setErro('Digite os 11 números do seu CPF.'); return; }
+    setEnviando(true);
+    try {
+      await aoConfirmar({ tipo: 'cpf', chave });
+      setTrocando(false);
+      setChave('');
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="cartao">
+      <h2>Receber pelo Pix</h2>
+      {verificado && !trocando ? (
+        <>
+          <p className="identidade">
+            <span className="selo-grande"><IconeSelo width="16" height="16" aria-hidden="true" /> Identidade verificada</span>
+          </p>
+          <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+            Você recebe os pagamentos na chave Pix CPF <b>{identidade.chave_pix?.mascarada}</b>.
+            Como a chave está no seu CPF, seu perfil mostra o selo para quem procura profissionais.
+          </p>
+          <Botao tipo="secundario" className="botao--curto" type="button" onClick={() => setTrocando(true)}>Trocar chave</Botao>
+        </>
+      ) : (
+        <form onSubmit={enviar} noValidate>
+          <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+            Cadastre a chave Pix em que você quer receber. Ela precisa ser do tipo CPF e ser o mesmo CPF desta conta:
+            assim confirmamos que é você, sem pedir foto de documento. Quem confirma ganha o selo de identidade verificada.
+          </p>
+          <Aviso>{erro}</Aviso>
+          <Campo
+            etiqueta="Chave Pix (CPF)"
+            inputMode="numeric"
+            placeholder="000.000.000-00"
+            value={chave}
+            onChange={(e) => setChave(formatarCpf(e.target.value))}
+            required
+          />
+          <div className="empilha">
+            <Botao type="submit" carregando={enviando}>Confirmar chave Pix</Botao>
+            {trocando && <Botao tipo="secundario" type="button" onClick={() => { setTrocando(false); setErro(''); }}>Cancelar</Botao>}
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// US21 - a taxa cai conforme o prestador conclui mais serviços.
+function CartaoTaxa({ taxa }) {
+  if (!taxa) return null;
+  return (
+    <div className="cartao">
+      <h2>Sua taxa no Fechô</h2>
+      <p className="taxa__atual">
+        <strong>{taxa.percentual}%</strong>
+        <span>sobre o valor de cada serviço concluído. O deslocamento é todo seu.</span>
+      </p>
+      <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+        {taxa.servicos_concluidos === 1 ? '1 serviço concluído' : `${taxa.servicos_concluidos} serviços concluídos`}.{' '}
+        {taxa.proxima
+          ? `Faltam ${taxa.proxima.faltam} para a taxa cair para ${taxa.proxima.percentual}% (a partir do ${taxa.proxima.a_partir_do_servico}º serviço).`
+          : 'Você já está na menor taxa.'}
+      </p>
+      <ol className="taxa__faixas">
+        {taxa.faixas.map((f, i) => {
+          const proxima = taxa.faixas[i + 1];
+          const texto = proxima
+            ? `do ${f.a_partir_do_servico}º ao ${proxima.a_partir_do_servico - 1}º serviço`
+            : `do ${f.a_partir_do_servico}º em diante`;
+          return (
+            <li key={f.percentual} className={f.percentual === taxa.percentual ? 'taxa__faixa--atual' : ''}>
+              <b>{f.percentual}%</b> <span>{texto}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
 
 export default function MeuPerfil() {
   const { usuario } = useAuth();
@@ -32,6 +131,10 @@ export default function MeuPerfil() {
   const [previa, setPrevia] = useState('');
   const [removerFoto, setRemoverFoto] = useState(false);
   const campoArquivo = useRef(null);
+  // US06
+  const [identidade, setIdentidade] = useState({ verificado: false, chave_pix: null });
+  const [taxa, setTaxa] = useState(null); // US21
+  const [extras, setExtras] = useState(null); // US25 / US19
 
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
@@ -52,6 +155,10 @@ export default function MeuPerfil() {
           bairros: p.bairros.map((b) => b.id),
           atende_apenas_mulheres: p.atende_apenas_mulheres
         };
+        if (p) setIdentidade({ verificado: p.verificado, chave_pix: p.chave_pix });
+        if (p) setTaxa(p.taxa || null);
+        // US25 - suspensao; US19 - metrica de complementares
+        if (p) setExtras({ motivo_suspensao: p.motivo_suspensao, suspenso_em: p.suspenso_em, complementares: p.complementares });
         if (p && p.categorias.length) {
           setPerfil(salvo);
           setRascunho(salvo);
@@ -71,6 +178,13 @@ export default function MeuPerfil() {
     }
     carregar();
   }, []);
+
+  async function confirmarChavePix(corpo) {
+    const dados = await api.cadastrarChavePix(corpo);
+    setIdentidade({ verificado: dados.prestador.verificado, chave_pix: dados.prestador.chave_pix });
+    setMensagem(dados.mensagem);
+    setErro('');
+  }
 
   function alternar(campo, id) {
     setRascunho((atual) => {
@@ -206,6 +320,12 @@ export default function MeuPerfil() {
 
       <Aviso>{erro}</Aviso>
       <Aviso tipo="sucesso">{mensagem}</Aviso>
+      {status === 'suspenso' && (
+        <Aviso>
+          Seu perfil está suspenso pela administração do Fechô{extras?.motivo_suspensao ? `: ${extras.motivo_suspensao}` : ''}.
+          Enquanto isso, você não aparece nas buscas e não recebe pedidos novos. Os serviços em andamento continuam.
+        </Aviso>
+      )}
 
       {!editando ? (
         <>
@@ -253,7 +373,24 @@ export default function MeuPerfil() {
             )}
           </div>
 
+          <CartaoChavePix identidade={identidade} aoConfirmar={confirmarChavePix} />
+
+          <CartaoTaxa taxa={taxa} />
+
+          {/* US22 - extrato; US19 - metrica publica de valor complementar */}
           <div className="cartao">
+            <h2>Seus recebimentos</h2>
+            <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+              Veja o que entrou, a taxa de cada serviço e o que ainda está congelado.
+              {extras?.complementares?.servicos > 0 && (
+                <> No seu perfil aparece que você pediu valor complementar em <b>{extras.complementares.propostas}</b> de {extras.complementares.servicos} serviços ({extras.complementares.percentual}%).</>
+              )}
+            </p>
+            <Link to="/extrato" className="botao botao--secundario botao--curto">Abrir extrato</Link>
+          </div>
+
+          {/* US25 - suspenso nao sai da suspensao sozinho */}
+          {status !== 'suspenso' && <div className="cartao">
             <h2>{status === 'ativo' ? 'Precisa dar uma pausa?' : 'Pronto para voltar?'}</h2>
             <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
               {status === 'ativo'
@@ -263,7 +400,7 @@ export default function MeuPerfil() {
             <Botao tipo="secundario" type="button" onClick={pausar}>
               {status === 'ativo' ? 'Pausar meu perfil' : 'Voltar a aparecer'}
             </Botao>
-          </div>
+          </div>}
         </>
       ) : (
         <form onSubmit={salvar}>

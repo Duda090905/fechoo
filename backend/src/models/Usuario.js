@@ -12,7 +12,9 @@ class Usuario extends Model {
       senha_hash: { type: DataTypes.STRING(120), allowNull: true },
       // US08 - preenchimento opcional, usado apenas pelo filtro de seguranca.
       sexo: { type: DataTypes.ENUM('feminino', 'masculino', 'nao_informado'), defaultValue: 'nao_informado' },
-      tipo_perfil: { type: DataTypes.ENUM('contratante', 'prestador'), allowNull: false },
+      // US25 - administrador: nao se cadastra pelo site; a conta e criada pelo
+      // script npm run admin:criar.
+      tipo_perfil: { type: DataTypes.ENUM('contratante', 'prestador', 'administrador'), allowNull: false },
       // ativo    - usa a plataforma normalmente
       // inativo  - conta desativada pela propria pessoa; dados preservados,
       //            perfil fora do ar
@@ -31,7 +33,9 @@ class Usuario extends Model {
       aviso_retencao_em: { type: DataTypes.DATE, allowNull: true },
       desativado_em: { type: DataTypes.DATE, allowNull: true },
       reativado_em: { type: DataTypes.DATE, allowNull: true },
-      excluido_em: { type: DataTypes.DATE, allowNull: true }
+      excluido_em: { type: DataTypes.DATE, allowNull: true },
+      // US17 - id do cliente no Asaas (cus_...), criado na primeira cobranca.
+      asaas_cliente_id: { type: DataTypes.STRING(40), allowNull: true }
     }, { sequelize, tableName: 'usuarios' });
   }
 

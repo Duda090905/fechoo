@@ -1,6 +1,89 @@
-# Fechô — Sprint 1
+# Fechô — projeto completo (Sprints 1 a 5)
 
-Plataforma de contratação de serviços com pagamento retido. Este repositório cobre o **Sprint 1: identidade, perfil e listagem** — 25 pontos.
+Plataforma de contratação de serviços com pagamento retido. Este repositório cobre o **Sprint 1** (identidade, perfil e listagem, 25 pontos), o **Sprint 2** (encontrar e combinar o serviço, 32), o **Sprint 3** (fechar o serviço: aceite, Pix congelado e selo, 29) o **Sprint 4** (depois do aceite: conclusão e repasse, taxa, cancelamento, nova data, avaliação e histórico, 35) e o **Sprint 5**, o final (quando algo dá errado e o lado de quem administra: disputa, painel do administrador, valor complementar e extrato). Com ele, as 25 histórias do backlog e o curinga US26 estão entregues.
+
+### Sprint 5 (final)
+
+| Nº | História | O que entrega |
+|---|---|---|
+| US23 | Abertura de disputa | O cliente abre a disputa (serviço em execução ou até 72 h depois de concluído) com justificativa e fotos; o dinheiro fica congelado, a confirmação automática para e o profissional é avisado e se defende |
+| US25 | Painel do administrador | Fila de disputas com as evidências, o chat e a ficha das partes; decisão devolver / liberar / dividir com justificativa, que gera o estorno ou a transferência; suspensão preventiva; relatório; registro de cada decisão |
+| US19 | Proposta complementar | No local, o profissional pede um valor a mais (até 50%, uma vez, com foto e justificativa); aceito, vira um Pix adicional congelado junto com o original; a frequência aparece no perfil |
+| US22 | Extrato do prestador | Por período: bruto, taxa e líquido de cada serviço, totais que conferem com as linhas, valores ainda congelados à parte e exportação em CSV |
+
+Cada critério, com o teste e o passo na tela, está no `Checklist Sprint 5 Fechô.md`; o que mudou e as decisões, no `ALTERACOES.md`.
+
+**Caminho com disputa.** Em execução ou Concluído → **Em disputa** (dinheiro congelado) → defesa do profissional (48 h) → decisão do administrador → **Resolvido**. *Devolver* estorna tudo ao cliente; *liberar* repassa ao profissional com a taxa normal; *dividir* devolve X% ao cliente e manda o resto ao profissional, sem taxa (como a multa de cancelamento).
+
+**Administrador.** Não existe cadastro de administrador pelo site. Crie a conta com `npm run admin:criar -- --nome "Equipe Fechô" --email admin@fecho.app --senha "umaSenhaForte1"` e entre pela tela normal de login: o menu mostra o **Painel**.
+
+### Sprint 4
+
+| Nº | História | Nota | O que entrega |
+|---|---|---|---|
+| US20 | Conclusão do serviço e repasse | 13 | Prestador inicia e marca como concluído; cliente confirma; o Pix vai para a chave do prestador já sem a taxa; sem resposta em 72 horas, confirma sozinho |
+| US24 | Avaliação mútua | 8 | Nota de 1 a 5 dos dois lados, publicadas juntas (ou em 7 dias); edição em 24 horas; resposta do prestador; média com peso 2 para os 10 serviços mais recentes; a nota só muda a busca a partir de 5 avaliações |
+| US15 | Cancelamento e estorno | 5 | Prévia de quanto cada um recebe e cancelamento com estorno: mais de 24 h = 100/0; menos de 24 h = 70/30; prestador no local (Cheguei) = 50/50; prestador cancela = 100/0 |
+| US21 | Taxa decrescente por volume | 3 | 8% até o 20º serviço, 6% do 21º ao 50º, 5% a partir do 51º, só sobre o valor do serviço; faixa no Meu perfil |
+| US14 | Reagendamento | 3 | Qualquer parte pede nova data; só vale com o aceite da outra; até 3 por serviço; o pagamento continua congelado |
+| US16 | Histórico e recontratação | 3 | "Quem já me atendeu", com data, valor e nota, filtro por categoria e "Chamar de novo" |
+
+Total: 13 + 8 + 5 + 3 + 3 + 3 = **35 pontos**. O que mudou, as decisões e os textos dos cards que precisam ser atualizados estão no `ALTERACOES.md`; cada critério, com o teste e o passo na tela, no `Checklist Sprint 4 Fechô.md`.
+
+**Caminho do serviço.** Aceito → (Cheguei) → Em execução → Concluído pelo prestador → Confirmado → Pago. Só o prestador inicia e conclui; só o cliente confirma. Na confirmação, a API calcula a taxa, confere se a chave Pix é do CPF do cadastro e manda o gateway transferir. Sem chave conferida, o serviço fica Confirmado com o repasse pendente, que sai sozinho quando o prestador cadastra a chave. A rotina que roda a cada 5 minutos confirma o que passou de 72 horas, tenta de novo os repasses pendentes e publica as avaliações vencidas.
+
+**Gateway.** O Asaas faz o repasse por `POST /transfers` (Pix para a chave CPF) e o estorno por `POST /payments/{id}/refund`. Nos dois modos, a tela do serviço mostra o **comprovante do pagamento**: o Pix pago, a taxa e o valor recebido (para o prestador), o valor devolvido no cancelamento, a data, o código da transferência ou da devolução e o banco (simulação ou Asaas sandbox). Para testar repasse e estorno no sandbox de verdade, siga o `GUIA-TESTE-ASAAS.md`.
+
+### Sprint 3
+
+| Nº | História | O que entrega |
+|---|---|---|
+| US06 | Verificação de identidade e selo | Chave Pix do tipo CPF conferida contra o CPF do cadastro; o selo só aparece quando bate |
+| US11 | Aceite do orçamento e liberação do endereço | Aceite com endereço; o endereço só sai da API do Aceito em diante, com log de acesso |
+| US17 | Pagamento retido via Pix | Cobrança Pix (Asaas sandbox ou simulada) com o valor exato do orçamento, identificador único e prazo |
+| US18 | Confirmação automática do pagamento (webhook) | `POST /api/pagamentos/webhook` com token e idempotência; pagamento vai para Retido e o serviço para Aceito |
+
+**Fluxo.** O contratante clica em *Aceitar e pagar com Pix* e informa o endereço → a API cria a cobrança (pagamento **Aguardando**; o serviço continua em *Orçamento enviado*) → o gateway avisa pelo webhook que o Pix caiu → na mesma transação o pagamento vira **Retido**, o serviço vira **Aceito**, o endereço é liberado ao prestador e os dois são avisados (no app e por e-mail). Se o Pix vencer sem pagamento, a cobrança é cancelada no gateway e o aceite fica liberado de novo.
+
+**Por que Aceito e não Pago no webhook.** Pela máquina de estados, *Pago* só vem depois da confirmação do contratante e do repasse (US20). No webhook o que acontece é o dinheiro congelar, e "Aceito (o dinheiro congela)" é exatamente esse estado.
+
+**Por que só chave Pix do tipo CPF (US06).** Pela regra do Pix, uma chave CPF só pode estar numa conta do dono daquele CPF. Se a chave é o CPF do cadastro, o titular é a mesma pessoa, sem consulta paga e sem foto de documento. Outros tipos de chave exigem consultar o titular no Banco Central, o que fica para a produção.
+
+#### Pagamento: simulado ou Asaas sandbox
+
+| `PAGAMENTO_GATEWAY` | Para que serve | Como o Pix é pago |
+|---|---|---|
+| `simulado` (padrão sem chave do Asaas) | testes, desenvolvimento e plano B sem internet | `npm run pix:pagar -- <id do serviço>` manda à API o mesmo aviso que o Asaas mandaria |
+| `asaas` | demonstração de ponta a ponta, sem dinheiro real | `npm run pix:pagar -- <id>` pede ao sandbox do Asaas que considere a cobrança paga; o Asaas manda o webhook |
+
+A API só aceita o endereço do **sandbox** do Asaas (`ASAAS_URL` precisa conter "sandbox"): credencial de produção é recusada na hora.
+
+Para usar o sandbox:
+
+1. Crie a conta em sandbox.asaas.com e gere a chave da API em *Integrações*. Coloque em `ASAAS_API_KEY` no `.env` (nunca no código).
+2. Invente um token longo (32 caracteres ou mais, sem espaço) e coloque em `ASAAS_WEBHOOK_TOKEN`.
+3. O Asaas precisa enxergar a API, que roda no seu computador. Abra um túnel (ferramenta à parte, combine com o grupo antes): `cloudflared tunnel --url http://localhost:3333` ou `ngrok http 3333`. Ele mostra um endereço https público.
+4. No painel do sandbox, em *Integrações > Webhooks*, cadastre `https://<endereço do túnel>/api/pagamentos/webhook`, o mesmo token do passo 2 e os eventos de cobrança.
+
+Sem túnel ou sem internet, use `PAGAMENTO_GATEWAY=simulado`: o resto do fluxo é idêntico.
+
+Opções do `pix:pagar` para mostrar os critérios da US18: `--repetir` (manda o mesmo aviso duas vezes: a segunda volta `duplicado`), `--token-errado` (volta 401) e `--local` (ignora o Asaas e manda direto para a API).
+
+### Sprint 2
+
+| Nº | História | Origem |
+|---|---|---|
+| US09 | Busca por categoria e bairro | backlog |
+| US10 | Solicitação de serviço e orçamento | backlog |
+| US12 | Chat interno do serviço | backlog |
+| US13 | Agendamento de data e hora | backlog |
+| US26 | Alterar a senha estando logado | curinga CC06 |
+
+Os cards coringa ganham o próximo número do backlog quando entram numa sprint: o CC06 virou a US26.
+
+**O que dependia das próximas histórias.** O aceite (US11) e o selo (US06) chegaram no Sprint 3. A nota média do cartão da busca continua dependendo da US24 (avaliações) e o fechamento do chat, da US20 (conclusão). Os testes automáticos simulam essas etapas direto no banco para provar os critérios, e o `npm run db:demo` faz o mesmo para a apresentação (contas `*.demo@fecho.app`, senha `demo1234`; para recriar com datas novas, `npm run db:demo -- --recriar`).
+
+### Sprint 1
 
 | Nº | História | Nota |
 |---|---|---|
@@ -11,8 +94,6 @@ Plataforma de contratação de serviços com pagamento retido. Este repositório
 | US05 | Perfil do prestador | 8 |
 | US07 | Pausar perfil | 1 |
 | US08 | Filtro de atendimento entre mulheres | 2 |
-
-Junto foi construída uma **listagem simples de prestadores**, sem a qual as US05, US07 e US08 não teriam como ser demonstradas. Ela só mostra quem tem perfil completo e está ativo, e tem apenas o filtro "apenas mulheres"; a busca por categoria e bairro é a US09, do próximo sprint.
 
 ---
 
@@ -28,6 +109,10 @@ CREATE DATABASE fecho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 As tabelas são criadas pela própria aplicação ao iniciar. O arquivo `backend/schema.sql` existe como referência do modelo, caso prefira criar na mão.
 
+**Banco que já existia no Sprint 1:** as tabelas novas (`servicos` e `mensagens`) são criadas sozinhas, mas as colunas e os índices novos precisam do SQL que está em `ALTERACOES.md`, seção *Sprint 2 > Banco de dados*.
+
+**Banco que já existia no Sprint 2:** não precisa fazer nada. Ao subir, a API cria as tabelas novas (`pagamentos`, `eventos_webhook`, `acessos_endereco`, `notificacoes`) e acrescenta as colunas novas nas tabelas que já existem (só acrescenta; nunca apaga nem altera). O console mostra quais colunas foram criadas.
+
 ### 2. API
 
 ```bash
@@ -35,6 +120,8 @@ cd backend
 npm install
 cp .env.example .env     # preencha DB_USER e DB_PASS
 npm run db:seed          # carrega áreas, categorias e bairros
+npm run db:demo          # (opcional) contas e serviços de demonstração (Sprints 2 a 5)
+npm run admin:criar -- --email admin@fecho.app --senha umaSenhaForte1   # conta de administrador (US25)
 npm run dev              # http://localhost:3333
 ```
 
@@ -54,7 +141,7 @@ cd backend
 npm run teste
 ```
 
-Sobe a API em um banco em memória e verifica os critérios de aceite do sprint, história por história. Não precisa do MySQL rodando. É o jeito mais rápido de demonstrar o sprint na apresentação.
+Sobe a API em um banco em memória e verifica os critérios de aceite dos cinco sprints, história por história (409 verificações). O pagamento roda no gateway simulado, sem internet. Não precisa do MySQL rodando. É o jeito mais rápido de demonstrar o sprint na apresentação.
 
 ---
 
@@ -78,13 +165,47 @@ Sobe a API em um banco em memória e verifica os critérios de aceite do sprint,
 | PUT | `/api/prestadores/foto` | US05 (enviar foto) | sim (prestador) |
 | DELETE | `/api/prestadores/foto` | US05 (remover foto) | sim (prestador) |
 | PATCH | `/api/prestadores/pausa` | US07 | sim (prestador) |
-| GET | `/api/prestadores` | US05, US07, US08 (listagem simples) | não |
+| PUT | `/api/conta/senha` | US26 (trocar a senha logado) | sim |
+| GET | `/api/prestadores?categoria=&bairro=&somente_mulheres=` | US09 (busca), US07, US08 | não |
+| POST | `/api/servicos` | US10, US13 (pedido com fotos, data e hora) | sim (contratante) |
+| GET | `/api/servicos` | US10 (meus pedidos e pendências do prestador) | sim |
+| GET | `/api/servicos/agenda` | US13 (compromissos depois do aceite) | sim |
+| GET | `/api/servicos/:id` | US10, US02 (só as duas partes) | sim |
+| POST | `/api/servicos/:id/orcamento` | US10, US13 (valor, prazo, horário, deslocamento) | sim (prestador) |
+| POST | `/api/servicos/:id/recusar` | US10 (recusar e encerrar) | sim (contratante) |
+| GET | `/api/servicos/:id/arquivos/:nome` | US10, US12 (fotos e imagens, só as partes) | sim |
+| GET | `/api/servicos/:id/mensagens?depois=` | US12 | sim |
+| POST | `/api/servicos/:id/mensagens` | US12 (texto e imagem) | sim |
+| PUT | `/api/prestadores/chave-pix` | US06 (chave Pix CPF e selo) | sim (prestador) |
+| POST | `/api/servicos/:id/aceitar` | US11, US17 (aceite com endereço; gera o Pix) | sim (contratante) |
+| POST | `/api/pagamentos/webhook` | US18 (aviso do gateway; vale o token `asaas-access-token`) | não (token) |
+| GET | `/api/notificacoes` | US11, US18 (avisos da própria pessoa) | sim |
+| POST | `/api/notificacoes/lidas` | US11, US18 | sim |
+| POST | `/api/servicos/:id/disputa` | US23 (justificativa + até 3 fotos) | sim (contratante do serviço) |
+| POST | `/api/servicos/:id/disputa/defesa` | US23 (defesa + até 3 fotos) | sim (prestador do serviço) |
+| POST | `/api/servicos/:id/complementar` | US19 (valor, justificativa e foto) | sim (prestador do serviço) |
+| POST | `/api/servicos/:id/complementar/aceitar` | US19 (gera o Pix adicional) | sim (contratante do serviço) |
+| POST | `/api/servicos/:id/complementar/recusar` | US19 | sim (contratante do serviço) |
+| GET | `/api/prestadores/extrato?de=&ate=` | US22 | sim (prestador) |
+| GET | `/api/prestadores/extrato.csv?de=&ate=` | US22 (exportar) | sim (prestador) |
+| GET | `/api/admin/disputas?status=` | US25 (fila) | sim (administrador) |
+| GET | `/api/admin/disputas/:id` | US25 (evidências, chat, histórico, partes) | sim (administrador) |
+| GET | `/api/admin/disputas/:id/arquivos/:nome` | US25 (fotos) | sim (administrador) |
+| POST | `/api/admin/disputas/:id/decisao` | US25 (devolver, liberar, dividir) | sim (administrador) |
+| GET | `/api/admin/prestadores?busca=` | US25 | sim (administrador) |
+| PATCH | `/api/admin/prestadores/:id/suspensao` | US25 (suspender ou reativar) | sim (administrador) |
+| GET | `/api/admin/relatorio?de=&ate=` | US25 | sim (administrador) |
+| GET | `/api/admin/acoes` | US25 (registro das decisões) | sim (administrador) |
 
 ---
 
 ## Front-end
 
-A home é enxuta e só fala do que o sistema faz neste sprint: capa com os dois caminhos (contratar ou oferecer serviço), as categorias vindas da API e um resumo para cada público. Pagamento retido, orçamento e avaliação entram na home quando forem entregues.
+Telas do Sprint 3: na página do serviço, **Aceitar e pagar com Pix** (endereço → tela do Pix com QR code, copia e cola e prazo, que se atualiza sozinha até o banco confirmar), o quadro **Pagamento congelado / garantido** e o endereço liberado; os **avisos** no topo de Meus serviços; o cartão **Receber pelo Pix** no Meu perfil. Sem o Asaas (modo simulado) a tela mostra só o copia e cola, porque o QR code vem pronto do gateway e o projeto não ganhou biblioteca para desenhá-lo.
+
+Telas do Sprint 2: **Profissionais** (a busca, escrita como uma frase: "Preciso de [serviço] no bairro [bairro]"), o painel **Pedir orçamento** que abre por cima da busca, **Meus serviços** (abas Pedidos e Agenda) e a página de cada serviço, com o pedido, o orçamento em forma de comprovante e a conversa. A troca de senha fica em **Minha conta**.
+
+A home é enxuta e só fala do que o sistema faz: capa com os dois caminhos (contratar ou oferecer serviço), as categorias vindas da API e um resumo para cada público. Pagamento retido, orçamento e avaliação entram na home quando forem entregues.
 
 As telas de conta (entrar, criar conta, recuperar senha) usam layout de duas colunas no desktop, com uma lateral escura que resume o que a plataforma oferece; no celular a lateral some e sobra só o formulário.
 
@@ -133,6 +254,20 @@ A anonimização mantém o registro da conta (para o que a lei exige guardar, co
 
 **Filtro entre mulheres (US08).** O campo de sexo é opcional no cadastro. A opção "atendo apenas mulheres" é da prestadora, nunca vem marcada por padrão, e o back-end recusa quem não se identificou como mulher. Quem não informou o sexo simplesmente não aparece quando o filtro está ligado. A finalidade é a segurança pessoal de quem recebe alguém em casa, não segmentação comercial.
 
+**Busca (US09).** Filtros opcionais de categoria e bairro, somados ao filtro entre mulheres. Só aparece prestador ativo, com conta ativa e com categoria e bairro. A ordem é: avaliação média (quem não tem nota vai para o fim), depois serviços concluídos (status confirmado ou pago), depois ordem de cadastro. Os campos de filtro têm índice (`idx_prestador_categorias_categoria`, `idx_prestador_bairros_bairro`, `idx_prestadores_status`).
+
+**Pedido e orçamento (US10).** Os status seguem os nomes do cartão: `aguardando_orcamento`, `orcamento_enviado` e `recusado`. A coluna já tem os demais estados da máquina de estados, para as próximas histórias. O prazo do orçamento é a duração estimada em horas (1 a 24). Taxa de deslocamento só quando o bairro do pedido está fora dos bairros do prestador (pode ser zero); dentro da área, é recusada. Quem atende apenas mulheres (US08) não recebe pedido de quem não se identificou como mulher.
+
+**Fotos do pedido e imagens do chat (US10, US12).** Até 3 fotos por pedido e 1 imagem por mensagem, JPG, PNG ou WebP de até 2 MB, conferidas pelo conteúdo. A localização gravada pelo celular (EXIF/XMP) é apagada antes de salvar, porque revelaria o endereço do contratante antes do aceite. Os arquivos ficam em `uploads/servicos`, que não é pasta pública: só as duas partes abrem, pela rota com login.
+
+**Agenda (US13).** Data e hora no pedido e na proposta; data no passado é recusada. Um horário fica ocupado pelo orçamento enviado e pelo compromisso aceito, do início até o fim do prazo. O compromisso aparece na agenda dos dois lados depois do aceite. Uma rotina de hora em hora manda o lembrete da véspera às duas partes (sem SMTP, aparece no console).
+
+**Chat (US12).** Só as duas partes abrem; para qualquer outra pessoa a resposta é 404, sem revelar que o serviço existe. Não existe edição nem exclusão de mensagem. O chat para de receber mensagens quando o serviço é concluído ou encerrado (recusado, cancelado, expirado), e as mensagens continuam disponíveis para consulta. O front busca as novas a cada 3 segundos.
+
+**Prazo de guarda das mídias (US12).** Imagens do chat e fotos do pedido ficam 90 dias depois do encerramento do serviço (`MIDIAS_RETENCAO_DIAS`). O prazo cobre a disputa (aberta em até 72 horas e decidida em até 7 dias) e o pedido de devolução de um Pix (MED), que pode ser feito em até 80 dias. Depois disso os arquivos saem do disco; o texto das mensagens fica.
+
+**Trocar a senha (US26).** Exige a senha atual e aplica a mesma regra do cadastro; a nova não pode ser igual à atual. Sobe o `token_versao`, o que encerra as outras sessões, e devolve um token novo para a sessão que fez a troca.
+
 **Cores.** Azul-noite `#14243D` como base, amarelo `#FFC93C` apenas na ação principal de cada tela. Amarelo com texto azul-noite passa no contraste mínimo da WCAG; amarelo como cor de texto, não. Verde e vermelho ficam reservados para dinheiro e problema, e não decoram nada.
 
 ---
@@ -142,4 +277,10 @@ A anonimização mantém o registro da conta (para o que a lei exige guardar, co
 1. **As 17 categorias em `backend/src/database/seed.js` são uma proposta.** Trocar pelos nomes exatos definidos no escopo do grupo e rodar `npm run db:seed` de novo.
 2. **A lista de bairros** tem 25 bairros de Campinas, também para substituir pela lista oficial de vocês.
 3. **Retenção de conta inativa.** Implementada com 12 meses e aviso 30 dias antes (recomendação do grupo). Confirmar o prazo com o cliente e escrevê-lo nos termos de uso.
-4. **Fotos em disco.** Servem para desenvolvimento e apresentação; em hospedagem real, usar armazenamento externo.5. **Migrations.** O projeto usa `sequelize.sync()`, que resolve em desenvolvimento. Para produção o certo é migração versionada.
+4. **Fotos em disco.** Servem para desenvolvimento e apresentação; em hospedagem real, usar armazenamento externo.
+5. **Migrations.** O projeto usa `sequelize.sync()`, que resolve em desenvolvimento. Para produção o certo é migração versionada.
+6. **Decisões do Sprint 5 a confirmar.** 48 horas para a defesa antes da decisão, "dividir" sem taxa e a métrica de complementar (propostas ÷ serviços aceitos). Ver `ALTERACOES.md`.
+7. **Prazo de guarda das mídias do chat (90 dias).** Proposta técnica a confirmar pelo grupo.
+8. **Pix pago depois de recusado ou fora do fluxo.** Fica registrado em `eventos_webhook` com o resultado `servico_fora_do_fluxo` e um aviso no console; a devolução do dinheiro é a US15 (cancelamento e estorno) ou a US25 (administrador).
+9. **CPF em texto puro.** O cadastro guarda o CPF sem a proteção por HMAC (ela foi revertida antes do Sprint 2). A US06 compara a chave Pix com esse CPF e o Asaas precisa dele para criar o cliente. Se o grupo voltar com o HMAC, a comparação da US06 continua igual (compara as impressões), mas a criação do cliente no Asaas vai precisar pedir o CPF no primeiro pagamento.
+10. **Túnel para o webhook.** No sandbox, o aviso do Asaas só chega ao computador de vocês por um túnel (cloudflared ou ngrok), que é uma ferramenta à parte.

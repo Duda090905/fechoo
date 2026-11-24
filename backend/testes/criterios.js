@@ -1,5 +1,5 @@
 /**
- * Verificacao dos criterios de aceite dos Sprints 1, 2, 3 e 4.
+ * Verificacao dos criterios de aceite dos Sprints 1, 2, 3, 4 e 5.
  * Sobe a API em memoria (sqlite) e chama os endpoints de verdade.
  *
  * Rodar com: npm run teste
@@ -1151,6 +1151,12 @@ async function rodar() {
   // =======================================================================
   const { testarSprint4 } = require('./sprint4');
   await testarSprint4({ chamar, checar, base, bairro, idsCategorias, terceiro: otto, sprint3 });
+
+  // =======================================================================
+  // SPRINT 5 - US23, US25, US19 e US22 (arquivo testes/sprint5.js)
+  // =======================================================================
+  const { testarSprint5 } = require('./sprint5');
+  await testarSprint5({ chamar, chamarForm, checar, base, bairro, idsCategorias, terceiro: otto });
 
   servidor.close();
   await sequelize.close();

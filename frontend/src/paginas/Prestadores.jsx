@@ -249,6 +249,17 @@ export default function Prestadores() {
                         ? 'Nenhum serviço concluído'
                         : `${p.servicos_concluidos} ${p.servicos_concluidos === 1 ? 'serviço concluído' : 'serviços concluídos'}`}
                     </span>
+                    {/* US19 - metrica de valor complementar no perfil */}
+                    {p.complementares?.servicos > 0 && (
+                      <>
+                        <span className="ficha__separador" aria-hidden="true" />
+                        <span title="Em quantos serviços aceitos pediu valor complementar">
+                          {p.complementares.propostas === 0
+                            ? 'Nunca pediu valor extra'
+                            : `Pediu valor extra em ${p.complementares.percentual}% dos serviços`}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

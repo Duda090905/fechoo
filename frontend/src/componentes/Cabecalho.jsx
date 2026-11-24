@@ -24,12 +24,25 @@ export default function Cabecalho() {
           <a href="#servicos" onClick={() => setAberto(false)}>Serviços</a>
         </>
       )}
-      <Link to="/prestadores" onClick={() => setAberto(false)}>Profissionais</Link>
-      {usuario ? (
+      {usuario?.tipo_perfil !== 'administrador' && (
+        <Link to="/prestadores" onClick={() => setAberto(false)}>Profissionais</Link>
+      )}
+      {usuario?.tipo_perfil === 'administrador' ? (
+        <>
+          {/* US25 */}
+          <Link to="/admin" onClick={() => setAberto(false)}>Painel</Link>
+          <Link to="/minha-conta" onClick={() => setAberto(false)}>Minha conta</Link>
+          <button type="button" onClick={sairEIr}>Sair</button>
+        </>
+      ) : usuario ? (
         <>
           <Link to="/servicos" onClick={() => setAberto(false)}>Meus serviços</Link>
           {usuario.tipo_perfil === 'prestador' && (
-            <Link to="/meu-perfil" onClick={() => setAberto(false)}>Meu perfil</Link>
+            <>
+              <Link to="/meu-perfil" onClick={() => setAberto(false)}>Meu perfil</Link>
+              {/* US22 */}
+              <Link to="/extrato" onClick={() => setAberto(false)}>Extrato</Link>
+            </>
           )}
           <Link to="/minha-conta" onClick={() => setAberto(false)}>Minha conta</Link>
           <button type="button" onClick={sairEIr}>Sair</button>

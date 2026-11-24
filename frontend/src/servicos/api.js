@@ -65,6 +65,40 @@ export async function baixarArquivoProtegido(caminho) {
   return URL.createObjectURL(await resposta.blob());
 }
 
+function consulta(filtros = {}) {
+  const busca = new URLSearchParams();
+  Object.entries(filtros).forEach(([chave, valor]) => {
+    if (valor !== '' && valor !== undefined && valor !== null) busca.append(chave, valor);
+  });
+  const texto = busca.toString();
+  return texto ? `?${texto}` : '';
+}
+
+// US22 - baixa o extrato em CSV (com login) e salva no aparelho.
+async function baixarExtratoCsv(filtros) {
+  const token = pegarToken();
+  let resposta;
+  try {
+    resposta = await fetch(`${BASE}/prestadores/extrato.csv${consulta(filtros)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new Error('Nao consegui falar com o servidor. Confira se a API esta rodando.');
+  }
+  if (resposta.status === 401) window.dispatchEvent(new Event(SESSAO_EXPIRADA));
+  if (!resposta.ok) {
+    const dados = await resposta.json().catch(() => ({}));
+    throw new Error(dados.erro || 'Não consegui gerar o arquivo.');
+  }
+  const nome = (/filename="([^"]+)"/.exec(resposta.headers.get('content-disposition') || '') || [])[1] || 'extrato-fecho.csv';
+  const url = URL.createObjectURL(await resposta.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export const api = {
   cadastrar: (corpo) => requisitar('/auth/register', { metodo: 'POST', corpo }),
   entrar: (corpo) => requisitar('/auth/login', { metodo: 'POST', corpo }),
@@ -137,6 +171,25 @@ export const api = {
   // US11 / US18 - avisos
   notificacoes: () => requisitar('/notificacoes', { autenticado: true }),
   marcarNotificacoesLidas: () => requisitar('/notificacoes/lidas', { metodo: 'POST', autenticado: true }),
+
+  // US23 - disputa (FormData com as fotos)
+  abrirDisputa: (id, form) => requisitar(`/servicos/${id}/disputa`, { metodo: 'POST', corpo: form, autenticado: true }),
+  defenderDisputa: (id, form) => requisitar(`/servicos/${id}/disputa/defesa`, { metodo: 'POST', corpo: form, autenticado: true }),
+  // US19 - proposta complementar
+  proporComplementar: (id, form) => requisitar(`/servicos/${id}/complementar`, { metodo: 'POST', corpo: form, autenticado: true }),
+  aceitarComplementar: (id) => requisitar(`/servicos/${id}/complementar/aceitar`, { metodo: 'POST', autenticado: true }),
+  recusarComplementar: (id) => requisitar(`/servicos/${id}/complementar/recusar`, { metodo: 'POST', autenticado: true }),
+  // US22 - extrato
+  extrato: (filtros) => requisitar(`/prestadores/extrato${consulta(filtros)}`, { autenticado: true }),
+  baixarExtratoCsv,
+  // US25 - painel do administrador
+  adminDisputas: (status) => requisitar(`/admin/disputas${consulta({ status })}`, { autenticado: true }),
+  adminDisputa: (id) => requisitar(`/admin/disputas/${id}`, { autenticado: true }),
+  adminDecidir: (id, corpo) => requisitar(`/admin/disputas/${id}/decisao`, { metodo: 'POST', corpo, autenticado: true }),
+  adminPrestadores: (busca) => requisitar(`/admin/prestadores${consulta({ busca })}`, { autenticado: true }),
+  adminSuspensao: (id, corpo) => requisitar(`/admin/prestadores/${id}/suspensao`, { metodo: 'PATCH', corpo, autenticado: true }),
+  adminRelatorio: (filtros) => requisitar(`/admin/relatorio${consulta(filtros)}`, { autenticado: true }),
+  adminAcoes: () => requisitar('/admin/acoes', { autenticado: true }),
 
   // US12 - chat
   mensagens: (id, depois = 0) => requisitar(`/servicos/${id}/mensagens${depois ? `?depois=${depois}` : ''}`, { autenticado: true }),

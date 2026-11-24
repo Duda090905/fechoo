@@ -14,6 +14,9 @@ import Prestadores from './paginas/Prestadores';
 import Servicos from './paginas/Servicos';
 import ServicoDetalhe from './paginas/ServicoDetalhe';
 import Historico from './paginas/Historico';
+import Extrato from './paginas/Extrato';
+import Admin from './paginas/Admin';
+import AdminDisputa from './paginas/AdminDisputa';
 
 // Nas telas de conta a lateral escura ja cumpre o papel do rodape.
 const SEM_RODAPE = ['/entrar', '/criar-conta', '/esqueci-senha', '/redefinir-senha'];
@@ -38,6 +41,11 @@ function Miolo() {
           <Route path="/servicos/:id" element={<RotaPrivada><ServicoDetalhe /></RotaPrivada>} />
           {/* US16 */}
           <Route path="/historico" element={<RotaPrivada perfil="contratante"><Historico /></RotaPrivada>} />
+          {/* US22 */}
+          <Route path="/extrato" element={<RotaPrivada perfil="prestador"><Extrato /></RotaPrivada>} />
+          {/* US25 */}
+          <Route path="/admin" element={<RotaPrivada perfil="administrador"><Admin /></RotaPrivada>} />
+          <Route path="/admin/disputas/:id" element={<RotaPrivada perfil="administrador"><AdminDisputa /></RotaPrivada>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

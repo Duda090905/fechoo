@@ -1,0 +1,53 @@
+/* US22 - Extrato do prestador */
+.pagina.pagina--extrato { max-width: 880px; }
+
+.extrato-filtro__campos { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.extrato-filtro__campos .campo { flex: 1 1 160px; margin: 0; }
+.extrato-filtro__atalhos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.extrato-filtro__atalho {
+  border: 1px solid var(--borda); background: var(--superficie); color: var(--azul-medio);
+  border-radius: var(--raio-total); padding: 6px 14px; font-size: 14px; cursor: pointer;
+}
+.extrato-filtro__atalho:hover { background: var(--azul-claro); }
+
+.extrato-totais { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.extrato-total {
+  display: grid; gap: 4px; padding: 16px 18px; border-radius: var(--raio-grande);
+  background: var(--superficie); border: 1px solid var(--borda); box-shadow: var(--sombra);
+}
+.extrato-total span { color: var(--texto-suave); font-size: 14px; }
+.extrato-total strong { font-family: var(--fonte-titulo); font-size: 22px; font-variant-numeric: tabular-nums; }
+.extrato-total small { color: var(--texto-claro); font-size: 13px; }
+.extrato-total--liquido { background: var(--azul-noite); border-color: var(--azul-noite); color: #fff; }
+.extrato-total--liquido span, .extrato-total--liquido small { color: #C9D3E3; }
+
+.extrato-cabeca { margin-bottom: 12px; }
+.extrato-cabeca h2 { margin: 0; display: inline-flex; align-items: center; gap: 8px; }
+
+.extrato-tabela { overflow-x: auto; }
+.extrato-tabela table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.extrato-tabela th {
+  text-align: left; font-weight: 600; font-size: 13px; color: var(--texto-suave);
+  padding: 8px 10px; border-bottom: 1px solid var(--borda);
+}
+.extrato-tabela td { padding: 12px 10px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+.extrato-tabela .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.extrato-tabela small { color: var(--texto-claro); }
+.extrato-tabela tfoot td { font-weight: 600; border-bottom: 0; border-top: 2px solid var(--azul-noite); }
+.extrato-servico { font-weight: 600; color: var(--azul-noite); }
+.extrato-origem { display: block; font-size: 13px; color: var(--texto-suave); }
+
+.extrato-retidos__total { font-family: var(--fonte-titulo); font-size: 20px; }
+.extrato-retidos__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.extrato-retidos__lista a {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--raio); background: var(--fundo); color: inherit; text-decoration: none;
+}
+.extrato-retidos__lista a:hover { background: var(--azul-claro); }
+.extrato-retidos__lista span { display: grid; }
+.extrato-retidos__lista small { color: var(--texto-suave); font-size: 13px; }
+.extrato-vazio { display: flex; gap: 8px; align-items: center; color: var(--texto-suave); margin: 0; }
+
+@media (max-width: 640px) {
+  .extrato-totais { grid-template-columns: 1fr; }
+}

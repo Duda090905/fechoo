@@ -12,7 +12,9 @@ import './painel.css';
 import './servicos.css';
 
 const HORA_MS = 60 * 60 * 1000;
-const ENCERRADOS = ['confirmado', 'pago', 'em_disputa', 'resolvido', 'recusado', 'cancelado', 'expirado'];
+const ENCERRADOS = ['confirmado', 'pago', 'resolvido', 'recusado', 'cancelado', 'expirado'];
+// US23 - em disputa ganha grupo proprio (o dinheiro esta congelado).
+const EM_DISPUTA = { titulo: 'Em disputa', filtro: (s) => s.status === 'em_disputa' };
 
 // Grupos da lista de pedidos, na ordem em que aparecem.
 const GRUPOS = {
@@ -23,6 +25,7 @@ const GRUPOS = {
     { titulo: 'Compromissos', filtro: (s) => ['aceito', 'em_execucao'].includes(s.status) },
     // US20 - concluído, esperando o cliente confirmar (até 72 horas)
     { titulo: 'Esperando o cliente confirmar', filtro: (s) => s.status === 'concluido' },
+    EM_DISPUTA,
     { titulo: 'Encerrados', filtro: (s) => ENCERRADOS.includes(s.status) }
   ],
   contratante: [
@@ -31,6 +34,7 @@ const GRUPOS = {
     { titulo: 'Aguardando orçamento', filtro: (s) => s.status === 'aguardando_orcamento' },
     { titulo: 'Orçamento enviado', filtro: (s) => s.status === 'orcamento_enviado' },
     { titulo: 'Compromissos', filtro: (s) => ['aceito', 'em_execucao'].includes(s.status) },
+    EM_DISPUTA,
     { titulo: 'Encerrados', filtro: (s) => ENCERRADOS.includes(s.status) }
   ]
 };

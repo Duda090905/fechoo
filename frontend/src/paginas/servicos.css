@@ -34,6 +34,7 @@
 .status--aceito, .status--em_execucao { background: var(--verde-fraco); color: #146B49; }
 .status--recusado, .status--cancelado, .status--expirado { background: #EEF1F6; color: var(--texto-suave); }
 .status--em_disputa { background: var(--vermelho-fraco); color: #9B2C2C; }
+.status--resolvido { background: var(--azul-claro); color: var(--azul-medio); }
 /* Sprint 4 - o servico depois do aceite */
 .status--concluido { background: var(--amarelo-fraco); color: #7A5900; }
 .status--confirmado, .status--pago { background: var(--verde-fraco); color: #146B49; }

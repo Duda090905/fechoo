@@ -26,7 +26,8 @@ export default function Entrar() {
         navegar('/minha-conta');
         return;
       }
-      navegar(dados.usuario.tipo_perfil === 'prestador' ? '/meu-perfil' : '/prestadores');
+      const destinos = { prestador: '/meu-perfil', administrador: '/admin' };
+      navegar(destinos[dados.usuario.tipo_perfil] || '/prestadores');
     } catch (e) {
       setErro(e.message);
     } finally {

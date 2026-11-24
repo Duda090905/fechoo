@@ -7,6 +7,7 @@ import Campo from '../componentes/Campo';
 import Chat from '../componentes/Chat';
 import ImagemProtegida from '../componentes/ImagemProtegida';
 import PagamentoPix from '../componentes/PagamentoPix';
+import { Disputa, Complementar } from '../componentes/DisputaComplementar';
 import {
   Andamento, Avaliacao, Cancelamento, LinhaDoTempo, NovaData
 } from '../componentes/AndamentoServico';
@@ -255,7 +256,8 @@ export default function ServicoDetalhe() {
   useEffect(() => { carregar(); }, [carregar]);
 
   // US18 - enquanto o Pix espera, consulta a API até o banco confirmar.
-  const pixEmAberto = Boolean(servico?.pagamento?.em_aberto);
+  // US19 - vale também para o Pix adicional da proposta complementar.
+  const pixEmAberto = Boolean(servico?.pagamento?.em_aberto || servico?.complementar?.pagamento?.em_aberto);
   useEffect(() => {
     if (!pixEmAberto) return undefined;
     const consulta = setInterval(carregar, INTERVALO_PIX_MS);
@@ -470,6 +472,10 @@ export default function ServicoDetalhe() {
             <NovaData servico={servico} aoAtualizar={aoAtualizar} />
             <Cancelamento servico={servico} aoAtualizar={aoAtualizar} />
           </Andamento>
+
+          {/* US19 - valor complementar; US23 / US25 - disputa e decisão */}
+          <Complementar servico={servico} aoAtualizar={aoAtualizar} aoAbrirFoto={(url, alt) => setFotoAmpliada({ url, alt })} />
+          <Disputa servico={servico} aoAtualizar={aoAtualizar} aoAbrirFoto={(url, alt) => setFotoAmpliada({ url, alt })} />
 
           {/* US24 - avaliação mútua */}
           <Avaliacao key={`${servico.id}-${servico.avaliacoes?.minha?.nota || 0}`} servico={servico} aoAtualizar={aoAtualizar} />

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../servicos/api';
 import { useAuth } from '../contexto/AuthContexto';
@@ -133,6 +134,7 @@ export default function MeuPerfil() {
   // US06
   const [identidade, setIdentidade] = useState({ verificado: false, chave_pix: null });
   const [taxa, setTaxa] = useState(null); // US21
+  const [extras, setExtras] = useState(null); // US25 / US19
 
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
@@ -155,6 +157,8 @@ export default function MeuPerfil() {
         };
         if (p) setIdentidade({ verificado: p.verificado, chave_pix: p.chave_pix });
         if (p) setTaxa(p.taxa || null);
+        // US25 - suspensao; US19 - metrica de complementares
+        if (p) setExtras({ motivo_suspensao: p.motivo_suspensao, suspenso_em: p.suspenso_em, complementares: p.complementares });
         if (p && p.categorias.length) {
           setPerfil(salvo);
           setRascunho(salvo);
@@ -316,6 +320,12 @@ export default function MeuPerfil() {
 
       <Aviso>{erro}</Aviso>
       <Aviso tipo="sucesso">{mensagem}</Aviso>
+      {status === 'suspenso' && (
+        <Aviso>
+          Seu perfil está suspenso pela administração do Fechô{extras?.motivo_suspensao ? `: ${extras.motivo_suspensao}` : ''}.
+          Enquanto isso, você não aparece nas buscas e não recebe pedidos novos. Os serviços em andamento continuam.
+        </Aviso>
+      )}
 
       {!editando ? (
         <>
@@ -367,7 +377,20 @@ export default function MeuPerfil() {
 
           <CartaoTaxa taxa={taxa} />
 
+          {/* US22 - extrato; US19 - metrica publica de valor complementar */}
           <div className="cartao">
+            <h2>Seus recebimentos</h2>
+            <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
+              Veja o que entrou, a taxa de cada serviço e o que ainda está congelado.
+              {extras?.complementares?.servicos > 0 && (
+                <> No seu perfil aparece que você pediu valor complementar em <b>{extras.complementares.propostas}</b> de {extras.complementares.servicos} serviços ({extras.complementares.percentual}%).</>
+              )}
+            </p>
+            <Link to="/extrato" className="botao botao--secundario botao--curto">Abrir extrato</Link>
+          </div>
+
+          {/* US25 - suspenso nao sai da suspensao sozinho */}
+          {status !== 'suspenso' && <div className="cartao">
             <h2>{status === 'ativo' ? 'Precisa dar uma pausa?' : 'Pronto para voltar?'}</h2>
             <p style={{ color: 'var(--texto-suave)', fontSize: 15 }}>
               {status === 'ativo'
@@ -377,7 +400,7 @@ export default function MeuPerfil() {
             <Botao tipo="secundario" type="button" onClick={pausar}>
               {status === 'ativo' ? 'Pausar meu perfil' : 'Voltar a aparecer'}
             </Botao>
-          </div>
+          </div>}
         </>
       ) : (
         <form onSubmit={salvar}>
